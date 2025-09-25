@@ -1,6 +1,10 @@
 from django.db import models
 from django.conf import settings
 from apps.menu.models import Restaurant, MenuItem
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.utils.crypto import get_random_string
+from decimal import Decimal
 
 class Order(models.Model):
     class Status(models.TextChoices):
@@ -36,6 +40,26 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order #{self.pk} - {self.restaurant.name}"
+    
+    # ----- Domain helpers -----
+
+    def ensure_pickup_code(self):
+        if not self.pickup_code:
+            self.pickup_code = get_random_string(8).upper()
+
+    def recalc_totals(self, tax_rate: Decimal = Decimal("0.00")):
+        """
+        Recompute subtotal/tax/total from line items.
+        Adjust tax_rate as you wish, e.g. Decimal('0.14975') for QC.
+        """
+        subtotal = sum((li.line_total for li in self.items.all()), Decimal("0.00"))
+        tax = (subtotal * tax_rate).quantize(Decimal("0.01"))
+        total = (subtotal + tax).quantize(Decimal("0.01"))
+        self.subtotal, self.tax, self.total_amount = subtotal, tax, total
+
+    def save(self, *args, **kwargs):
+        self.ensure_pickup_code()
+        super().save(*args, **kwargs)
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order,
@@ -53,6 +77,15 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.item_name} x{self.quantity}"
+    
+    def save(self, *args, **kwargs):
+        # 1) same-restaurant guard (when menu_item provided)
+        if self.menu_item and self.menu_item.restaurant_id != self.order.restaurant_id:
+            raise ValueError("OrderItem.menu_item must belong to the same restaurant as Order.")
+
+        # 2) derive line_total
+        self.line_total = (self.unit_price * self.quantity).quantize(Decimal("0.01"))
+        super().save(*args, **kwargs)
 
 class Payment(models.Model):
     class Provider(models.TextChoices):
@@ -77,3 +110,12 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment for Order #{self.order_id} ({self.status})"
+    
+    # ---- Signals to keep Order totals in sync ----
+
+@receiver(post_save, sender=OrderItem)
+@receiver(post_delete, sender=OrderItem)
+def update_order_totals(sender, instance, **kwargs):
+    order = instance.order
+    order.recalc_totals(tax_rate=Decimal("0.00"))  # adjust if you want tax now
+    order.save(update_fields=["subtotal", "tax", "total_amount", "updated_at"])
