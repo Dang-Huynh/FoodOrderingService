@@ -30,7 +30,7 @@ export default function NavBar() {
   const [query, setQuery] = useState("");
 
   const { count, openCart } = useCart();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth(); // <-- reactive user
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + "/");
 
@@ -56,12 +56,14 @@ export default function NavBar() {
       >
         <Container maxWidth="lg">
           <Toolbar disableGutters sx={{ gap: 1 }}>
+            {/* Mobile menu button */}
             <Box sx={{ display: { xs: "inline-flex", md: "none" } }}>
-              <IconButton edge="start" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
+              <IconButton edge="start" onClick={() => setMobileOpen(true)}>
                 <MenuIcon />
               </IconButton>
             </Box>
 
+            {/* Logo */}
             <Typography
               variant="h6"
               component={RouterLink}
@@ -71,7 +73,8 @@ export default function NavBar() {
               UberEats Clone
             </Typography>
 
-            <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", gap: 0.5, mr: 2 }}>
+            {/* Desktop links */}
+            <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1, alignItems: "center" }}>
               <Button component={RouterLink} to="/" color={isActive("/") ? "primary" : "inherit"}>Home</Button>
               <Button component={RouterLink} to="/menu" color={isActive("/menu") ? "primary" : "inherit"}>Menu</Button>
               <Button component={RouterLink} to="/orders" color={isActive("/orders") ? "primary" : "inherit"}>Orders</Button>
@@ -79,7 +82,8 @@ export default function NavBar() {
 
             <Box sx={{ flex: 1 }} />
 
-            <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", minWidth: 280, mr: 1.5 }}>
+            {/* Search bar */}
+            <Box sx={{ display: { xs: "none", md: "flex" }, minWidth: 280, mr: 1.5 }}>
               <TextField
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -89,50 +93,32 @@ export default function NavBar() {
                 fullWidth
                 variant="outlined"
                 InputProps={{
-                  startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>),
+                  startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
                   autoComplete: "off",
                 }}
               />
             </Box>
 
+            {/* Right icons */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <IconButton aria-label="Cart" sx={{ color: "inherit" }} onClick={openCart}>
+              <IconButton onClick={openCart}>
                 <Badge badgeContent={count} color="secondary">
                   <ShoppingCartIcon />
                 </Badge>
               </IconButton>
 
+              {/* Reactive login/logout */}
               {user ? (
-                <Button onClick={logout} variant="contained" sx={ui.blackBtn}>
-                  Logout
-                </Button>
+                <Button onClick={logout} variant="contained" sx={ui.blackBtn}>Logout</Button>
               ) : (
                 <>
-                  <Button
-                    component={RouterLink}
-                    to="/login"
-                    startIcon={<LoginIcon />}
-                    variant="contained"
-                    sx={{ ...ui.blackBtn, display: { xs: "none", md: "inline-flex" } }}
-                  >
-                    Login
-                  </Button>
-                  <Button
-                    component={RouterLink}
-                    to="/register"
-                    variant="outlined"
-                    sx={{ ml: 1, display: { xs: "none", md: "inline-flex" } }}
-                  >
-                    Sign Up
-                  </Button>
+                  <Button component={RouterLink} to="/login" startIcon={<LoginIcon />} variant="contained" sx={{ ...ui.blackBtn, display: { xs: "none", md: "inline-flex" } }}>Login</Button>
+                  <Button component={RouterLink} to="/register" variant="outlined" sx={{ ml: 1, display: { xs: "none", md: "inline-flex" } }}>Sign Up</Button>
                 </>
               )}
 
-              <IconButton
-                onClick={() => setMobileOpen(true)}
-                sx={{ display: { xs: "inline-flex", md: "none" } }}
-                aria-label="Search and menu"
-              >
+              {/* Mobile search/menu */}
+              <IconButton onClick={() => setMobileOpen(true)} sx={{ display: { xs: "inline-flex", md: "none" } }}>
                 <SearchIcon />
               </IconButton>
             </Box>
@@ -145,7 +131,7 @@ export default function NavBar() {
         <Box sx={{ width: 300, p: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: 800, flex: 1 }}>Menu</Typography>
-            <IconButton onClick={() => setMobileOpen(false)} aria-label="Close"><CloseIcon /></IconButton>
+            <IconButton onClick={() => setMobileOpen(false)}><CloseIcon /></IconButton>
           </Box>
 
           <TextField
@@ -157,10 +143,7 @@ export default function NavBar() {
             fullWidth
             autoFocus
             variant="outlined"
-            InputProps={{
-              startAdornment: (<InputAdornment position="start"><SearchIcon /></InputAdornment>),
-              autoComplete: "off",
-            }}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
           />
 
           <Divider sx={{ my: 2 }} />
@@ -191,33 +174,13 @@ export default function NavBar() {
 
           <Divider sx={{ my: 1.5 }} />
 
+          {/* Mobile login/logout */}
           {user ? (
-            <Button fullWidth onClick={() => { logout(); setMobileOpen(false); }} sx={ui.blackBtn}>
-              Logout
-            </Button>
+            <Button fullWidth onClick={() => { logout(); setMobileOpen(false); }} sx={ui.blackBtn}>Logout</Button>
           ) : (
             <>
-              <Button
-                fullWidth
-                component={RouterLink}
-                to="/login"
-                startIcon={<AccountCircleIcon />}
-                variant="contained"
-                sx={{ mb: 1, ...ui.blackBtn }}
-                onClick={() => setMobileOpen(false)}
-              >
-                Login
-              </Button>
-              <Button
-                fullWidth
-                component={RouterLink}
-                to="/register"
-                variant="outlined"
-                sx={ui.blackBtn}
-                onClick={() => setMobileOpen(false)}
-              >
-                Sign Up
-              </Button>
+              <Button fullWidth component={RouterLink} to="/login" startIcon={<AccountCircleIcon />} variant="contained" sx={{ mb: 1, ...ui.blackBtn }} onClick={() => setMobileOpen(false)}>Login</Button>
+              <Button fullWidth component={RouterLink} to="/register" variant="outlined" sx={ui.blackBtn} onClick={() => setMobileOpen(false)}>Sign Up</Button>
             </>
           )}
         </Box>

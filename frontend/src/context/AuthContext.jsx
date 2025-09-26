@@ -14,7 +14,10 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password }),
     });
 
-    if (!res.ok) throw new Error("Invalid credentials");
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || "Invalid credentials");
+    }
 
     const data = await res.json();
     localStorage.setItem("token", data.access);
@@ -31,14 +34,16 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ full_name, email, password }),
     });
 
-    if (!res.ok) throw new Error("Registration failed");
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || "Registration failed");
+    }
 
     const data = await res.json();
     localStorage.setItem("token", data.access);
 
     const decoded = jwt_decode(data.access);
     setUser({ email: decoded.email, id: decoded.user_id });
-    return decoded;
   };
 
   // Logout
