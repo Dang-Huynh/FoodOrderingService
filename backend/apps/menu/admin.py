@@ -5,7 +5,7 @@ from .models import Restaurant, MenuItem
 class RestaurantAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "owner_user", "is_active", "created_at")
     list_filter = ("is_active",)
-    search_fields = ("name", "owner_user__email", "cuisine_type")
+    search_fields = ("name","address", "owner_user__email", "cuisine_type")
     autocomplete_fields = ("owner_user",)
 
 @admin.register(MenuItem)

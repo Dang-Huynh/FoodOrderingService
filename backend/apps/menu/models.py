@@ -21,6 +21,7 @@ class Restaurant(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    image = models.ImageField(upload_to='restaurant_images/', blank=True, null=True)
 
     objects = RestaurantQuerySet.as_manager()
 
