@@ -28,6 +28,12 @@ class MenuItemListCreateAPIView(generics.ListCreateAPIView):
             restaurant_id=restaurant_id, is_available=True
         )
 
+    def get_serializer_context(self):
+        # Pass request context so SerializerMethodField can build absolute URLs
+        context = super().get_serializer_context()
+        context.update({"request": self.request})
+        return context
+
     def perform_create(self, serializer):
         restaurant_id = self.kwargs["restaurant_id"]
         serializer.save(restaurant_id=restaurant_id)

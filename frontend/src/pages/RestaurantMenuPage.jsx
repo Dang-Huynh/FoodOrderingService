@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -26,8 +26,8 @@ import {
 } from "@mui/icons-material";
 import { useCart } from "../context/CartContext";
 
-// --- Helper: group menu items by category ---
-function groupByCategory(items) {
+// Helper: group menu items by category
+const groupByCategory = (items) => {
   const grouped = {};
   items.forEach((item) => {
     const category = item.category || "Other";
@@ -35,7 +35,7 @@ function groupByCategory(items) {
     grouped[category].push(item);
   });
   return grouped;
-}
+};
 
 export default function RestaurantMenuPage() {
   const { id } = useParams();
@@ -48,34 +48,29 @@ export default function RestaurantMenuPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { add, openCart } = useCart();
+  const baseURL = import.meta.env.VITE_API_URL.replace(/\/$/, "");
 
-  // Fetch restaurant + menu
+  // Fetch restaurant + menu items
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
+        const resRestaurant = await fetch(`${baseURL}/menu/restaurants/${id}/`);
+        if (!resRestaurant.ok) throw new Error("Failed to fetch restaurant details");
+        const restaurantData = await resRestaurant.json();
 
-        // 1. Restaurant details
-        const res1 = await fetch(`${base}/menu/restaurants/${id}/`);
-        if (!res1.ok) throw new Error("Failed to fetch restaurant details");
-        const restaurantData = await res1.json();
+        const resMenu = await fetch(`${baseURL}/menu/restaurants/${id}/menu/`);
+        if (!resMenu.ok) throw new Error("Failed to fetch menu items");
+        const menuData = await resMenu.json();
 
-        // 2. Menu items
-        const res2 = await fetch(`${base}/menu/restaurants/${id}/menu/`);
-        if (!res2.ok) throw new Error("Failed to fetch menu items");
-        const menuData = await res2.json();
-
-        // 3. Combine
         setRestaurant({
           ...restaurantData,
           menu: groupByCategory(menuData),
         });
 
-        // Load favorite
         const favKey = `fav_restaurant_${id}`;
         const savedFav = localStorage.getItem(favKey);
-        setIsFavorite(savedFav ? savedFav === "1" : false);
+        setIsFavorite(savedFav === "1");
       } catch (err) {
         setError(err.message);
       } finally {
@@ -83,7 +78,7 @@ export default function RestaurantMenuPage() {
       }
     };
     fetchData();
-  }, [id]);
+  }, [id, baseURL]);
 
   // Save favorite to localStorage
   useEffect(() => {
@@ -92,10 +87,7 @@ export default function RestaurantMenuPage() {
     }
   }, [id, isFavorite, restaurant]);
 
-  const sections = useMemo(
-    () => (restaurant ? Object.keys(restaurant.menu || {}) : []),
-    [restaurant]
-  );
+  const sections = useMemo(() => (restaurant ? Object.keys(restaurant.menu || {}) : []), [restaurant]);
 
   const filterItems = useCallback(
     (items) =>
@@ -126,45 +118,56 @@ export default function RestaurantMenuPage() {
 
   return (
     <Box sx={{ bgcolor: "#f5f5f5", minHeight: "100vh", pb: 10 }}>
-      {/* Header */}
+      {/* Header Image */}
       <Box sx={{ position: "relative" }}>
-        <CardMedia component="img" height="250" image={restaurant.image} alt={restaurant.name} />
+        <CardMedia
+          component="img"
+          height="250"
+          image={restaurant.image || "/placeholder.png"}
+          alt={restaurant.name}
+        />
         <IconButton
           onClick={() => navigate(-1)}
-          sx={{ position: "absolute", top: 16, left: 16, backgroundColor: "white", "&:hover": { backgroundColor: "#f0f0f0" } }}
+          sx={{
+            position: "absolute",
+            top: 16,
+            left: 16,
+            backgroundColor: "white",
+            "&:hover": { backgroundColor: "#f0f0f0" },
+          }}
         >
           <ArrowBackIcon />
         </IconButton>
         <IconButton
           onClick={() => setIsFavorite((f) => !f)}
-          sx={{ position: "absolute", top: 16, right: 16, backgroundColor: "white", "&:hover": { backgroundColor: "#f0f0f0" } }}
+          sx={{
+            position: "absolute",
+            top: 16,
+            right: 16,
+            backgroundColor: "white",
+            "&:hover": { backgroundColor: "#f0f0f0" },
+          }}
         >
           {isFavorite ? <FavoriteIcon sx={{ color: "red" }} /> : <FavoriteBorderIcon />}
         </IconButton>
       </Box>
 
       <Container maxWidth="lg">
-        {/* Restaurant info */}
+        {/* Restaurant Info */}
         <Card sx={{ mt: -4, borderRadius: "16px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", position: "relative", zIndex: 1 }}>
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
               <Typography variant="h4" sx={{ fontWeight: 600 }}>{restaurant.name}</Typography>
               <Chip
                 icon={<StarIcon sx={{ color: "white", fontSize: "16px" }} />}
-                label={restaurant.rating}
+                label={restaurant.rating || "-"}
                 size="small"
                 sx={{ backgroundColor: "#3d8f3d", color: "white", fontWeight: 600, fontSize: "0.8rem" }}
               />
             </Box>
-
             <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-              {restaurant.cuisine}
+              {restaurant.cuisine || ""}
             </Typography>
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {restaurant.distance} • {restaurant.deliveryTime} • {restaurant.deliveryFee}
-            </Typography>
-
             {restaurant.offer && (
               <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
                 <OfferIcon sx={{ color: "#e76f51", fontSize: "18px", mr: 0.5 }} />
@@ -214,40 +217,30 @@ export default function RestaurantMenuPage() {
           </AppBar>
         </Box>
 
-        {/* Menu content */}
+        {/* Menu Content */}
         <Box sx={{ mt: 3 }}>
           {tab === 0 ? (
-            <Box>
-              {Object.entries(groupedFiltered).map(([section, items]) => (
-                <SectionBlock key={section} title={section}>
-                  <Grid container spacing={2}>
-                    {items.map((item) => (
-                      <Grid item xs={12} sm={6} key={`${section}-${item.id}`}>
-                        <MenuCard item={item} onAdd={() => addToCart(item)} />
-                      </Grid>
-                    ))}
-                  </Grid>
-                </SectionBlock>
-              ))}
-              {Object.keys(groupedFiltered).length === 0 && (
-                <Typography color="text.secondary">No dishes match your search.</Typography>
-              )}
-            </Box>
-          ) : (
-            <Box>
-              <SectionBlock title={sections[tab - 1]}>
+            Object.entries(groupedFiltered).map(([section, items]) => (
+              <SectionBlock key={section} title={section}>
                 <Grid container spacing={2}>
-                  {filterItems(restaurant.menu[sections[tab - 1]] || []).map((item) => (
-                    <Grid item xs={12} sm={6} key={`${sections[tab - 1]}-${item.id}`}>
+                  {items.map((item) => (
+                    <Grid item xs={12} sm={6} key={`${section}-${item.id}`}>
                       <MenuCard item={item} onAdd={() => addToCart(item)} />
                     </Grid>
                   ))}
                 </Grid>
-                {filterItems(restaurant.menu[sections[tab - 1]] || []).length === 0 && (
-                  <Typography color="text.secondary">No dishes match your search.</Typography>
-                )}
               </SectionBlock>
-            </Box>
+            ))
+          ) : (
+            <SectionBlock title={sections[tab - 1]}>
+              <Grid container spacing={2}>
+                {filterItems(restaurant.menu[sections[tab - 1]] || []).map((item) => (
+                  <Grid item xs={12} sm={6} key={`${sections[tab - 1]}-${item.id}`}>
+                    <MenuCard item={item} onAdd={() => addToCart(item)} />
+                  </Grid>
+                ))}
+              </Grid>
+            </SectionBlock>
           )}
         </Box>
       </Container>
@@ -255,7 +248,7 @@ export default function RestaurantMenuPage() {
   );
 }
 
-/** --- Small components --- */
+// --- Section component ---
 function SectionBlock({ title, children }) {
   return (
     <Box sx={{ mb: 4 }}>
@@ -265,27 +258,24 @@ function SectionBlock({ title, children }) {
   );
 }
 
+// --- Menu item card ---
 function MenuCard({ item, onAdd }) {
   return (
-    <Card
-      sx={{
-        borderRadius: "12px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        transition: "transform 0.2s, box-shadow 0.2s",
-        "&:hover": { transform: "translateY(-4px)", boxShadow: "0 6px 12px rgba(0,0,0,0.15)" },
-        height: "100%",
-      }}
-    >
+    <Card sx={{ borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", height: "100%" }}>
       <Box sx={{ display: "flex", p: 2 }}>
         <Box sx={{ flex: 1, mr: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>{item.name}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{item.description}</Typography>
-          <Typography variant="body1" fontWeight="bold">
-            ${Number(item.price)?.toFixed(2) || "0.00"}
-          </Typography>
+          <Typography variant="body1" fontWeight="bold">${Number(item.price)?.toFixed(2)}</Typography>
         </Box>
         <Box sx={{ width: 100, height: 100, position: "relative" }}>
-          <CardMedia component="img" height="100" image={item.image} alt={item.name} sx={{ borderRadius: "8px" }} />
+          <CardMedia
+            component="img"
+            height="100"
+            image={item.image || "/placeholder.png"}
+            alt={item.name}
+            sx={{ borderRadius: "8px" }}
+          />
           <Button
             variant="contained"
             size="small"
