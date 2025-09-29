@@ -1,199 +1,195 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
+  Container,
   Typography,
-  TextField,
-  Button,
+  Grid,
   Card,
   CardContent,
-  Container
+  Button,
+  CircularProgress,
 } from "@mui/material";
 import {
   Restaurant as RestaurantIcon,
   LocalShipping as DeliveryIcon,
   CreditCard as PaymentIcon,
-  Search as SearchIcon,
-  LocationOn as LocationIcon
+  LocalOffer as OfferIcon,
 } from "@mui/icons-material";
 
 function HomePage() {
-  const [address, setAddress] = useState("");
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
-  const handleSearch = async () => {
-    if (!query.trim()) return; 
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/menu/restaurants/?q=${query}&address=${address}`
-      );
+  const [restaurants, setRestaurants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-      if (!response.ok) throw new Error("Failed to fetch results");
-      const data = await response.json();
-      setResults(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    async function fetchRestaurants() {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_URL}/menu/restaurants/`);
+        if (!res.ok) throw new Error("Failed to load restaurants");
+        const data = await res.json();
+        setRestaurants(data);
+        setError("");
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
-  };
+    fetchRestaurants();
+  }, [API_URL]);
 
   return (
-    <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
-      {/* Hero Section */}
+    <Box sx={{ bgcolor: "#f5f5f5", minHeight: "100vh" }}>
+      {/* Hero */}
       <Box
         sx={{
           background: "linear-gradient(to right, #000000, #222222)",
           color: "white",
-          py: { xs: 4, md: 6 },
+          py: { xs: 5, md: 8 },
           px: 2,
-          position: "relative",
-          zIndex: 1
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", maxWidth: 800, mx: "auto" }}>
+          <Box sx={{ textAlign: "center", maxWidth: 900, mx: "auto" }}>
             <Typography
               variant="h2"
-              sx={{ fontWeight: 700, fontSize: { xs: "2.5rem", md: "3.5rem" }, mb: 2 }}
+              sx={{
+                fontWeight: 800,
+                fontSize: { xs: "2.4rem", md: "3.6rem" },
+                letterSpacing: -0.5,
+                mb: 2,
+              }}
             >
               Order food anytime, anywhere
             </Typography>
             <Typography
               variant="h6"
-              sx={{ opacity: 0.9, mb: 4, fontSize: { xs: "1.1rem", md: "1.25rem" } }}
-            >
-              Fresh meals delivered to your door in minutes.
-            </Typography>
-
-            {/* Search Bar */}
-            <Box
               sx={{
-                display: "flex",
-                flexDirection: { xs: "column", sm: "row" },
-                gap: 1,
-                maxWidth: 1000,
-                mx: "auto",
-                bgcolor: "white",
-                borderRadius: "28px",
-                p: 1,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
+                opacity: 0.9,
+                mb: 3,
+                fontSize: { xs: "1.05rem", md: "1.25rem" },
               }}
             >
-              <Box sx={{ display: "flex", alignItems: "center", flex: 1 }}>
-                <LocationIcon sx={{ color: "text.secondary", ml: 1, mr: 1 }} />
-                <TextField
-                  placeholder="Enter delivery address"
-                  variant="standard"
-                  InputProps={{ disableUnderline: true }}
-                  fullWidth
-                  sx={{ mr: 1 }}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                />
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", flex: 2 }}>
-                <SearchIcon sx={{ color: "text.secondary", ml: 1, mr: 1 }} />
-                <TextField
-                  placeholder="Search for restaurants or dishes..."
-                  variant="standard"
-                  InputProps={{ disableUnderline: true }}
-                  fullWidth
-                  sx={{ mr: 1 }}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </Box>
+              Fresh meals from local favorites—delivered fast.
+            </Typography>
+
+            <Box sx={{ display: "inline-flex", gap: 1 }}>
               <Button
+                component={RouterLink}
+                to="/restaurants"
                 variant="contained"
                 sx={{
-                  borderRadius: "24px",
-                  py: 1.5,
+                  bgcolor: "white",
+                  color: "black",
+                  fontWeight: 700,
                   px: 3,
-                  fontWeight: 600,
-                  backgroundColor: "black",
-                  color: "white",
-                  "&:hover": { backgroundColor: "#333" }
+                  py: 1.4,
+                  borderRadius: 2,
+                  "&:hover": { bgcolor: "#f5f5f5" },
                 }}
-                onClick={handleSearch}
               >
-                {loading ? "Searching..." : "Find Food"}
+                Browse Restaurants
               </Button>
-            </Box>
-
-            {/* Search Results */}
-            <Box sx={{ mt: 4 }}>
-              {error && <Typography color="error">{error}</Typography>}
-              {results.length > 0 && (
-                <>
-                  <Typography variant="h5" sx={{ mb: 2 }}>Results:</Typography>
-                  <Box sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
-                    gap: 2
-                  }}>
-                    {results.map((item) => (
-                      <Card key={item.id} sx={{ p: 2 }}>
-                        <Typography variant="h6">{item.name}</Typography>
-                        <Typography variant="body2" color="text.secondary">{item.description}</Typography>
-                      </Card>
-                    ))}
-                  </Box>
-                </>
-              )}
+              <Button
+                component={RouterLink}
+                to="/deals"
+                variant="outlined"
+                sx={{
+                  color: "white",
+                  borderColor: "rgba(255,255,255,0.6)",
+                  fontWeight: 700,
+                  px: 3,
+                  py: 1.4,
+                  borderRadius: 2,
+                  "&:hover": {
+                    borderColor: "white",
+                    bgcolor: "rgba(255,255,255,0.08)",
+                  },
+                }}
+                startIcon={<OfferIcon />}
+              >
+                View Deals
+              </Button>
             </Box>
           </Box>
         </Container>
       </Box>
 
-      {/* Features Section */}
+      {/* Features */}
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
-        <Typography variant="h4" sx={{ textAlign: "center", fontWeight: 600, mb: 4 }}>
-          Why choose us?
-        </Typography>
-        <Box sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
-          gap: 4
-        }}>
-          {[
-            { icon: RestaurantIcon, title: "Wide Variety", desc: "Choose from hundreds of local restaurants." },
-            { icon: DeliveryIcon, title: "Fast Delivery", desc: "Get your meal delivered in 30 minutes or less." },
-            { icon: PaymentIcon, title: "Easy Payments", desc: "Pay securely with credit card or Stripe." }
-          ].map((feature, index) => (
-            <Card key={index} sx={{
-              textAlign: "center",
-              p: 3,
-              borderRadius: "16px",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-              border: "1px solid",
-              borderColor: "divider",
-              height: "100%"
-            }}>
-              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-                <Box sx={{
-                  bgcolor: "#f5f5f5",
-                  borderRadius: "50%",
-                  width: 80,
-                  height: 80,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>
-                  <feature.icon sx={{ fontSize: 40, color: "primary.main" }} />
-                </Box>
-              </Box>
-              <CardContent sx={{ p: 0 }}>
-                <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>{feature.title}</Typography>
-                <Typography variant="body1" color="text.secondary">{feature.desc}</Typography>
-              </CardContent>
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card sx={{ textAlign: "center", p: 3, borderRadius: "16px" }}>
+              <RestaurantIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                Wide Variety
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Explore hundreds of local spots and top-rated picks.
+              </Typography>
             </Card>
-          ))}
-        </Box>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card sx={{ textAlign: "center", p: 3, borderRadius: "16px" }}>
+              <DeliveryIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                Fast Delivery
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Live tracking and reliable ETAs, every time.
+              </Typography>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <Card sx={{ textAlign: "center", p: 3, borderRadius: "16px" }}>
+              <PaymentIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                Easy Payments
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Secure checkout with cards and saved methods.
+              </Typography>
+            </Card>
+          </Grid>
+        </Grid>
+      </Container>
+
+      {/* Restaurants Preview */}
+      <Container maxWidth="lg" sx={{ py: 6 }}>
+        <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
+          Popular Restaurants
+        </Typography>
+
+        {loading ? (
+          <CircularProgress />
+        ) : error ? (
+          <Typography color="error">{error}</Typography>
+        ) : (
+          <Grid container spacing={3}>
+            {restaurants.slice(0, 3).map((r) => (
+              <Grid item xs={12} sm={6} md={4} key={r.id}>
+                <Card
+                  component={RouterLink}
+                  to={`/restaurants/${r.id}`}
+                  sx={{ p: 2, textDecoration: "none" }}
+                >
+                  <CardContent>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {r.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {r.description || "Delicious meals available"}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
       </Container>
     </Box>
   );

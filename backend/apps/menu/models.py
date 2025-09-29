@@ -10,18 +10,28 @@ class MenuItemQuerySet(models.QuerySet):
         return self.filter(is_available=True)
 
 class Restaurant(models.Model):
-    owner_user = models.ForeignKey(settings.AUTH_USER_MODEL,
-                                   on_delete=models.RESTRICT,
-                                   related_name="restaurants")
+    owner_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.RESTRICT,
+        related_name="restaurants"
+    )
     name = models.CharField(max_length=180)
     cuisine_type = models.CharField(max_length=80, blank=True)
     phone = models.CharField(max_length=40, blank=True)
     email = models.EmailField(blank=True)
     address = models.CharField(max_length=255, blank=True)
     is_active = models.BooleanField(default=True)
+    image = models.ImageField(upload_to='restaurant_images/', blank=True, null=True)
+
+    # Optional fields for frontend display
+    rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
+    distance = models.CharField(max_length=50, blank=True)
+    deliveryTime = models.CharField(max_length=50, blank=True)
+    deliveryFee = models.CharField(max_length=50, blank=True)
+    offer = models.CharField(max_length=255, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    image = models.ImageField(upload_to='restaurant_images/', blank=True, null=True)
 
     objects = RestaurantQuerySet.as_manager()
 
@@ -29,9 +39,11 @@ class Restaurant(models.Model):
         return self.name
 
 class MenuItem(models.Model):
-    restaurant = models.ForeignKey(Restaurant,
-                                   on_delete=models.RESTRICT,
-                                   related_name="menu_items")
+    restaurant = models.ForeignKey(
+        Restaurant,
+        on_delete=models.RESTRICT,
+        related_name="menu_items"
+    )
     name = models.CharField(max_length=180)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
