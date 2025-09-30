@@ -21,7 +21,7 @@ class Restaurant(models.Model):
     email = models.EmailField(blank=True)
     address = models.CharField(max_length=255, blank=True)
     is_active = models.BooleanField(default=True)
-    image = models.ImageField(upload_to='restaurant_images/', blank=True, null=True)
+    image = models.URLField(max_length=500, blank=True, null=True)  # <-- switched
 
     # Optional fields for frontend display
     rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
@@ -38,6 +38,7 @@ class Restaurant(models.Model):
     def __str__(self):
         return self.name
 
+
 class MenuItem(models.Model):
     restaurant = models.ForeignKey(
         Restaurant,
@@ -47,8 +48,9 @@ class MenuItem(models.Model):
     name = models.CharField(max_length=180)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    category = models.CharField(max_length=50, blank=True)
     is_available = models.BooleanField(default=True)
-    image = models.ImageField(upload_to="menu_items/", blank=True, null=True)
+    image = models.URLField(max_length=500, blank=True, null=True)  # <-- switched
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

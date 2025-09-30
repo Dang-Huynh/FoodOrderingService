@@ -1,8 +1,8 @@
 import React, {
   useEffect,
-  useMemo,
   useState,
   useCallback,
+  useMemo,
   useRef,
 } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -51,7 +51,7 @@ export default function RestaurantMenuPage() {
   const { add, openCart } = useCart();
 
   const [restaurant, setRestaurant] = useState(null);
-  const [menuItems, setMenuItems] = useState([]);
+  const [menu, setMenu] = useState({}); // now grouped by category
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,13 +66,14 @@ export default function RestaurantMenuPage() {
     const fetchData = async () => {
       try {
         const restaurantRes = await axios.get(`${apiUrl}/menu/restaurants/${id}/`);
-        setRestaurant(restaurantRes.data);
+        const data = restaurantRes.data;
+        setRestaurant(data);
 
-        const menuRes = await axios.get(`${apiUrl}/menu/restaurants/${id}/menu/`);
-        setMenuItems(menuRes.data);
-
-        setSections(Object.keys(menuRes.data?.menu || {}));
+        // menu is already grouped by category from backend
+        setMenu(data.menu || {}); 
+        setSections(Object.keys(data.menu || {}));
         setLoading(false);
+        
       } catch (err) {
         console.error(err);
         setError("Failed to load restaurant or menu data.");
@@ -81,6 +82,7 @@ export default function RestaurantMenuPage() {
     };
     fetchData();
   }, [id, apiUrl]);
+
 
   // favorite persistence
   useEffect(() => {
@@ -105,11 +107,11 @@ export default function RestaurantMenuPage() {
   const grouped = useMemo(() => {
     const out = {};
     sections.forEach((s) => {
-      const list = filterItems(menuItems.filter((i) => i.category === s) || []);
+      const list = Array.isArray(menu[s]) ? filterItems(menu[s]) : [];
       if (list.length) out[s] = list;
     });
     return out;
-  }, [sections, menuItems, filterItems]);
+  }, [sections, menu, filterItems]);
 
   const addToCart = (item) => {
     add(item);
@@ -137,7 +139,12 @@ export default function RestaurantMenuPage() {
       {/* Hero */}
       <Box sx={{ position: "relative" }}>
         {restaurant?.image && (
-          <CardMedia component="img" height="260" image={restaurant.image} alt={restaurant.name} />
+          <CardMedia
+            component="img"
+            height="260"
+            image={restaurant.image}
+            alt={restaurant.name}
+          />
         )}
         <Box
           sx={{
@@ -169,7 +176,11 @@ export default function RestaurantMenuPage() {
             "&:hover": { backgroundColor: "#f0f0f0" },
           }}
         >
-          {isFavorite ? <FavoriteIcon sx={{ color: "red" }} /> : <FavoriteBorderIcon />}
+          {isFavorite ? (
+            <FavoriteIcon sx={{ color: "red" }} />
+          ) : (
+            <FavoriteBorderIcon />
+          )}
         </IconButton>
 
         {/* Info overlay */}
@@ -191,8 +202,8 @@ export default function RestaurantMenuPage() {
                 {restaurant.name}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {restaurant.cuisine} • {restaurant.distance} • {restaurant.deliveryTime} •{" "}
-                {restaurant.deliveryFee}
+                {restaurant.cuisine} • {restaurant.distance} •{" "}
+                {restaurant.deliveryTime} • {restaurant.deliveryFee}
               </Typography>
               {restaurant.offer && (
                 <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
@@ -274,18 +285,18 @@ export default function RestaurantMenuPage() {
       {/* Menu Items */}
       <Container maxWidth="lg" sx={{ mt: 3 }}>
         {tab === 0
-          ? sections.map((section) => (
+          ? Object.entries(grouped).map(([section, items]) => (
               <Section
                 key={section}
                 title={section}
-                items={filterItems(menuItems.filter((i) => i.category === section))}
+                items={items}
                 onAdd={addToCart}
               />
             ))
           : sections[tab - 1] && (
               <Section
                 title={sections[tab - 1]}
-                items={filterItems(menuItems.filter((i) => i.category === sections[tab - 1]))}
+                items={grouped[sections[tab - 1]] || []}
                 onAdd={addToCart}
               />
             )}
@@ -297,7 +308,11 @@ export default function RestaurantMenuPage() {
 /** ---------- Section ---------- */
 function Section({ title, items, onAdd }) {
   if (!items || !items.length)
-    return <Typography color="text.secondary">No dishes found.</Typography>;
+    return (
+      <Typography color="text.secondary" sx={{ mb: 4 }}>
+        No dishes found.
+      </Typography>
+    );
   return (
     <Box sx={{ mb: 4 }}>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
