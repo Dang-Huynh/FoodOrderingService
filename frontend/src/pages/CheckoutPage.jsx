@@ -26,7 +26,7 @@ import {
 import { Delete as DeleteIcon } from "@mui/icons-material";
 import { placeOrder } from "../api";
 
-/** ---------------- UI tokens (keeps styling consistent across pages) ---------------- */
+/** ---------------- UI tokens ---------------- */
 const ui = {
   pageBg: "#fafbfc",
   card: {
@@ -43,16 +43,7 @@ const ui = {
 /** ---------------- Helpers ---------------- */
 const fmt = (n) => `$${n.toFixed(2)}`;
 
-const fromLocalProfile = () => {
-  try {
-    const raw = localStorage.getItem("userProfile");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-// Fallbacks if no profile exists yet
+/** ✅ Inline mocks */
 const mockAddresses = [
   {
     id: "addr-default",
@@ -65,36 +56,29 @@ const mockAddresses = [
     isDefault: true,
     instructions: "Ring bell twice",
   },
+  {
+    id: "addr-work",
+    label: "Work",
+    line1: "77 Hudson Blvd",
+    line2: "Floor 19",
+    city: "New York",
+    state: "NY",
+    zip: "10018",
+    isDefault: false,
+  },
 ];
-const mockPayments = [{ id: "pm-default", brand: "Visa", last4: "4242", exp: "04/28", isDefault: true }];
 
-/** Normalize legacy cart where items had no qty */
-function normalizeCart(list) {
-  if (!Array.isArray(list)) return [];
-  // If already has qty, keep as-is
-  const lastRestaurantId = localStorage.getItem("lastRestaurantId");
-  if (list.length && typeof list[0].qty === "number") {
-    // backfill restaurantId if missing
-    return list.map((it) =>
-      it.restaurantId || !lastRestaurantId
-        ? it
-        : { ...it, restaurantId: Number(lastRestaurantId) }
-    );
-  }
-  // legacy cart where each click pushed a duplicate item without qty
-  const map = new Map();
-  list.forEach((it) => {
-    const key = it.id;
-    const base = {
-      ...it,
-      restaurantId:
-        it.restaurantId || (lastRestaurantId ? Number(lastRestaurantId) : undefined),
-    };
-    if (!map.has(key)) map.set(key, { ...base, qty: 1 });
-    else map.get(key).qty += 1;
-  });
-  return Array.from(map.values());
-}
+const mockPayments = [
+  { id: "pm-visa", brand: "Visa", last4: "4242", exp: "04/28", isDefault: true },
+  { id: "pm-amex", brand: "Amex", last4: "0005", exp: "11/27", isDefault: false },
+];
+
+/** Promo codes inline (type: PCT or ABS) */
+const promoCodes = [
+  { code: "WELCOME20", type: "PCT", value: 0.2, label: "20% off" },
+  { code: "FREESHIP", type: "ABS", value: 2.99, label: "Free delivery" },
+  { code: "SAVE10", type: "ABS", value: 10, label: "$10 off" },
+];
 
 /** Chip group control */
 function ChipGroup({ value, onChange, options }) {
@@ -126,9 +110,8 @@ function Row({ label, value }) {
 /** ---------------- Main Component ---------------- */
 export default function CheckoutPage() {
   const navigate = useNavigate();
-  const { clear } = useCart();
+  const { cart, inc, dec, remove, clear } = useCart();
 
-  const [cart, setCart] = useState(null); // null = loading, [] = empty
   const [addresses, setAddresses] = useState(null);
   const [payments, setPayments] = useState(null);
 
@@ -146,21 +129,10 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
 
-  /** Load cart */
+  /** Load mock addresses/payments */
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("cart")) || [];
-      setCart(normalizeCart(saved));
-    } catch {
-      setCart([]);
-    }
-  }, []);
-
-  /** Load addresses/payments from profile or fallback mocks */
-  useEffect(() => {
-    const profile = fromLocalProfile();
-    const a = (profile?.addresses || []).length ? profile.addresses : mockAddresses;
-    const p = (profile?.paymentMethods || []).length ? profile.paymentMethods : mockPayments;
+    const a = mockAddresses;
+    const p = mockPayments;
     setAddresses(a);
     setPayments(p);
     const defAddr = a.find((x) => x.isDefault) || a[0];
@@ -169,48 +141,52 @@ export default function CheckoutPage() {
     setPaymentId(defPay?.id || "");
   }, []);
 
-  /** Cart ops */
-  const removeFromCart = (id) => {
-    const next = (cart || []).filter((i) => i.id !== id);
-    setCart(next);
-    localStorage.setItem("cart", JSON.stringify(next));
-  };
-
-  /** Totals */
-  const { subtotal, deliveryFee, serviceFee, tax, tip, discount, total } = useMemo(() => {
-    const sub = (cart || []).reduce((sum, i) => sum + (i.price || 0) * (i.qty || 1), 0);
-    const delivery = sub > 40 ? 0 : 2.99;
-    const service = sub * 0.05;
-    const t = (sub + delivery + service) * 0.08875; // NYC-ish example
-    const tipBase = sub + delivery + service;
-    const tipVal = tipBase * tipPct;
-    const disc =
-      appliedPromo?.type === "PCT"
-        ? sub * appliedPromo.value
-        : appliedPromo?.type === "ABS"
-        ? appliedPromo.value
-        : 0;
-    const tot = Math.max(0, sub - disc) + delivery + service + t + tipVal;
-    return { subtotal: sub, deliveryFee: delivery, serviceFee: service, tax: t, tip: tipVal, discount: disc, total: tot };
-  }, [cart, tipPct, appliedPromo]);
+  /** Totals (cart from context) */
+  const { subtotal, deliveryFee, serviceFee, tax, tip, discount, total } =
+    useMemo(() => {
+      const sub = (cart || []).reduce(
+        (sum, i) => sum + (i.price || 0) * (i.qty || 1),
+        0
+      );
+      const delivery = sub > 40 ? 0 : 2.99;
+      const service = sub * 0.05;
+      const t = (sub + delivery + service) * 0.08875; // NYC-ish example
+      const tipBase = sub + delivery + service;
+      const tipVal = tipBase * tipPct;
+      const disc =
+        appliedPromo?.type === "PCT"
+          ? sub * appliedPromo.value
+          : appliedPromo?.type === "ABS"
+          ? appliedPromo.value
+          : 0;
+      const tot = Math.max(0, sub - disc) + delivery + service + t + tipVal;
+      return {
+        subtotal: sub,
+        deliveryFee: delivery,
+        serviceFee: service,
+        tax: t,
+        tip: tipVal,
+        discount: disc,
+        total: tot,
+      };
+    }, [cart, tipPct, appliedPromo]);
 
   const canPlace =
     !placing &&
     (cart?.length ?? 0) > 0 &&
     addressId &&
     paymentId &&
-    (deliveryTime === "ASAP" || (deliveryTime === "SCHEDULED" && scheduledTime));
+    (deliveryTime === "ASAP" ||
+      (deliveryTime === "SCHEDULED" && scheduledTime));
 
-  /** Promo */
+  /** Promo (uses inline codes) */
   const applyPromo = () => {
     setError("");
     const code = promo.trim().toUpperCase();
     if (!code) return;
-    if (code === "WELCOME20") {
-      setAppliedPromo({ code, type: "PCT", value: 0.2, label: "20% off" });
-      setPromo("");
-    } else if (code === "FREESHIP") {
-      setAppliedPromo({ code, type: "ABS", value: 2.99, label: "Free delivery" });
+    const hit = promoCodes.find((x) => x.code === code);
+    if (hit) {
+      setAppliedPromo(hit);
       setPromo("");
     } else {
       setAppliedPromo(null);
@@ -218,48 +194,36 @@ export default function CheckoutPage() {
     }
   };
 
-  /** Place order (stub) */
-  const handlePlaceOrder  = async () => {
+  /** Place order */
+  const handlePlaceOrder = async () => {
     if (!canPlace) return;
     setPlacing(true);
     setError("");
     try {
-      // we must know which restaurant this cart belongs to
       let restaurantId = cart?.[0]?.restaurantId;
-
-      // fallback if missing
       if (!restaurantId) {
         const fallback = localStorage.getItem("lastRestaurantId");
-        if (fallback) {
-          restaurantId = parseInt(fallback);
-          // patch all cart items if needed
-          setCart(cart.map(i => ({ ...i, restaurantId })));
-        }
+        if (fallback) restaurantId = parseInt(fallback);
       }
       if (!restaurantId) {
         setError("Missing restaurant reference. Please add items again.");
         return;
       }
 
-      // Map cart -> backend items (snapshot required fields)
       const items = (cart || []).map((it) => ({
-        menu_item_id: it.id,           // MenuItem PK
-        name: it.name,                 // snapshot
-        unit_price: String(it.price),  // snapshot
+        menu_item_id: it.id,
+        name: it.name,
+        unit_price: String(it.price),
         quantity: it.qty ?? it.quantity ?? 1,
         image: it.image || "",
       }));
 
-      const payload = {
-        restaurant_id: restaurantId,
-        items,
-      };
-
+      const payload = { restaurant_id: restaurantId, items };
       const placed = await placeOrder(payload);
+
       clear();
-      navigate(`/order/${placed.id}`); // go to order details
+      navigate(`/order/${placed.id}`);
     } catch (e) {
-      // surface server detail if present
       const msg =
         e?.response?.data?.detail ||
         e?.response?.data?.message ||
@@ -271,12 +235,22 @@ export default function CheckoutPage() {
     }
   };
 
-  const loading = cart === null || addresses === null || payments === null;
+  const loading = addresses === null || payments === null;
 
   return (
-    <Box sx={{ bgcolor: ui.pageBg, minHeight: "100vh", pb: { xs: 10, md: 4 }, pt: 3 }}>
+    <Box
+      sx={{
+        bgcolor: ui.pageBg,
+        minHeight: "100vh",
+        pb: { xs: 10, md: 4 },
+        pt: 3,
+      }}
+    >
       <Container maxWidth="lg">
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 2, letterSpacing: -0.2 }}>
+        <Typography
+          variant="h4"
+          sx={{ fontWeight: 800, mb: 2, letterSpacing: -0.2 }}
+        >
           Checkout
         </Typography>
 
@@ -286,44 +260,147 @@ export default function CheckoutPage() {
           </Alert>
         )}
 
-        <Grid container spacing={3}>
+        <Grid container spacing={4}>
           {/* Left column */}
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12} md={10}>
             {/* Order summary */}
             <Card sx={{ ...ui.card, mb: 3 }}>
               <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                  Order Summary
+                <Typography
+                  variant="overline"
+                  sx={{
+                    color: "text.secondary",
+                    letterSpacing: 1,
+                    fontWeight: 700,
+                  }}
+                >
+                  ORDER SUMMARY
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+                  Review your items
                 </Typography>
 
                 {loading ? (
                   <Skeleton variant="rectangular" height={120} />
                 ) : (cart?.length ?? 0) === 0 ? (
-                  <Typography color="text.secondary">Your cart is empty.</Typography>
+                  <Typography color="text.secondary">
+                    Your cart is empty.
+                  </Typography>
                 ) : (
                   <>
                     <List>
                       {cart.map((item) => (
                         <ListItem
                           key={item.id}
+                          sx={{
+                            px: 0,
+                            pr: { xs: 10, sm: 20 },
+                            py: 1,
+                            "&:not(:last-of-type)": {
+                              borderBottom: "1px solid #f0f2f4",
+                            },
+                          }}
                           secondaryAction={
-                            <IconButton edge="end" aria-label="Remove item" onClick={() => removeFromCart(item.id)}>
-                              <DeleteIcon />
-                            </IconButton>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                minWidth: 120,
+                                justifyContent: "flex-end",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Typography
+                                sx={{ fontWeight: 700, whiteSpace: "nowrap" }}
+                              >
+                                {fmt((item.price || 0) * (item.qty || 1))}
+                              </Typography>
+                              <IconButton
+                                edge="end"
+                                aria-label="Remove item"
+                                onClick={() => remove(item.id)}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Box>
                           }
                         >
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <Typography sx={{ fontWeight: 600 }}>
-                                  {item.name}
-                                  {item.qty > 1 ? ` × ${item.qty}` : ""}
-                                </Typography>
-                                <Typography>{fmt((item.price || 0) * (item.qty || 1))}</Typography>
-                              </Box>
-                            }
-                            secondary={item.description}
+                          {/* Thumbnail */}
+                          <Box
+                            component="img"
+                            src={item.image}
+                            alt={item.name}
+                            loading="lazy"
+                            sx={{
+                              width: 96,
+                              height: 64,
+                              borderRadius: 1,
+                              objectFit: "cover",
+                              mr: 1.5,
+                              flexShrink: 0,
+                              border: "1px solid #eef0f2",
+                            }}
                           />
+
+                          {/* Name + desc + qty chips */}
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography
+                              sx={{ fontWeight: 700, lineHeight: 1.2 }}
+                              noWrap
+                            >
+                              {item.name}
+                              {item.qty > 1 ? ` × ${item.qty}` : ""}
+                            </Typography>
+                            {item.description && (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                noWrap
+                              >
+                                {item.description}
+                              </Typography>
+                            )}
+
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                              sx={{ mt: 1 }}
+                            >
+                              <Chip
+                                label="-"
+                                onClick={() => dec(item.id)}
+                                variant="outlined"
+                                size="small"
+                                sx={{
+                                  height: 28,
+                                  borderRadius: "999px",
+                                  px: 0.5,
+                                }}
+                              />
+                              <Typography
+                                sx={{
+                                  fontWeight: 700,
+                                  minWidth: 24,
+                                  textAlign: "center",
+                                }}
+                              >
+                                {item.qty || 1}
+                              </Typography>
+                              <Chip
+                                label="+"
+                                onClick={() => inc(item.id)}
+                                variant="outlined"
+                                size="small"
+                                sx={{
+                                  height: 28,
+                                  borderRadius: "999px",
+                                  px: 0.5,
+                                }}
+                              />
+                            </Stack>
+                          </Box>
                         </ListItem>
                       ))}
                     </List>
@@ -355,14 +432,26 @@ export default function CheckoutPage() {
             {/* Address selection */}
             <Card sx={{ ...ui.card, mb: 3 }}>
               <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                  Delivery Address
+                <Typography
+                  variant="overline"
+                  sx={{
+                    color: "text.secondary",
+                    letterSpacing: 1,
+                    fontWeight: 700,
+                  }}
+                >
+                  DELIVERY ADDRESS
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+                  Choose where we’re heading
                 </Typography>
 
                 {loading ? (
                   <Skeleton variant="rectangular" height={68} />
                 ) : (addresses || []).length === 0 ? (
-                  <Typography color="text.secondary">No addresses yet.</Typography>
+                  <Typography color="text.secondary">
+                    No addresses yet.
+                  </Typography>
                 ) : (
                   <List>
                     {addresses.map((a) => (
@@ -372,10 +461,16 @@ export default function CheckoutPage() {
                         onClick={() => setAddressId(a.id)}
                         sx={{ borderRadius: 1 }}
                       >
-                        <Radio edge="start" checked={addressId === a.id} tabIndex={-1} />
+                        <Radio
+                          edge="start"
+                          checked={addressId === a.id}
+                          tabIndex={-1}
+                        />
                         <ListItemText
                           primary={<b>{a.label}</b>}
-                          secondary={`${a.line1}${a.line2 ? `, ${a.line2}` : ""}, ${a.city}`}
+                          secondary={`${a.line1}${
+                            a.line2 ? `, ${a.line2}` : ""
+                          }, ${a.city}`}
                         />
                       </ListItemButton>
                     ))}
@@ -387,7 +482,10 @@ export default function CheckoutPage() {
                     Add new address
                   </Link>
                   {addressId && (
-                    <Link component="button" onClick={() => navigate("/profile")}>
+                    <Link
+                      component="button"
+                      onClick={() => navigate("/profile")}
+                    >
                       Edit
                     </Link>
                   )}
@@ -398,14 +496,26 @@ export default function CheckoutPage() {
             {/* Payment selection */}
             <Card sx={{ ...ui.card, mb: 3 }}>
               <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                  Payment Method
+                <Typography
+                  variant="overline"
+                  sx={{
+                    color: "text.secondary",
+                    letterSpacing: 1,
+                    fontWeight: 700,
+                  }}
+                >
+                  PAYMENT METHOD
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
+                  How would you like to pay?
                 </Typography>
 
                 {loading ? (
                   <Skeleton variant="rectangular" height={68} />
                 ) : (payments || []).length === 0 ? (
-                  <Typography color="text.secondary">No payment methods yet.</Typography>
+                  <Typography color="text.secondary">
+                    No payment methods yet.
+                  </Typography>
                 ) : (
                   <List>
                     {payments.map((p) => (
@@ -415,8 +525,15 @@ export default function CheckoutPage() {
                         onClick={() => setPaymentId(p.id)}
                         sx={{ borderRadius: 1 }}
                       >
-                        <Radio edge="start" checked={paymentId === p.id} tabIndex={-1} />
-                        <ListItemText primary={`${p.brand} •••• ${p.last4}`} secondary={`Expires ${p.exp}`} />
+                        <Radio
+                          edge="start"
+                          checked={paymentId === p.id}
+                          tabIndex={-1}
+                        />
+                        <ListItemText
+                          primary={`${p.brand} •••• ${p.last4}`}
+                          secondary={`Expires ${p.exp}`}
+                        />
                       </ListItemButton>
                     ))}
                   </List>
@@ -427,7 +544,10 @@ export default function CheckoutPage() {
                     Add new payment
                   </Link>
                   {paymentId && (
-                    <Link component="button" onClick={() => navigate("/profile")}>
+                    <Link
+                      component="button"
+                      onClick={() => navigate("/profile")}
+                    >
                       Edit
                     </Link>
                   )}
@@ -438,8 +558,18 @@ export default function CheckoutPage() {
             {/* Delivery options: time + tip */}
             <Card sx={{ ...ui.card, mb: 3 }}>
               <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-                  Delivery Options
+                <Typography
+                  variant="overline"
+                  sx={{
+                    color: "text.secondary",
+                    letterSpacing: 1,
+                    fontWeight: 700,
+                  }}
+                >
+                  DELIVERY OPTIONS
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>
+                  Time & tip
                 </Typography>
 
                 <Typography sx={{ mb: 1, fontWeight: 600 }}>Time</Typography>
@@ -480,8 +610,10 @@ export default function CheckoutPage() {
           </Grid>
 
           {/* Right column: totals & CTA */}
-          <Grid item xs={12} md={4}>
-            <Card sx={{ ...ui.card, position: { md: "sticky" }, top: { md: 24 } }}>
+          <Grid item xs={12} md={2}>
+            <Card
+              sx={{ ...ui.card, position: { md: "sticky" }, top: { md: 24 } }}
+            >
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                   Total
@@ -492,7 +624,12 @@ export default function CheckoutPage() {
                 ) : (
                   <>
                     <Row label="Subtotal" value={fmt(subtotal)} />
-                    {discount > 0 && <Row label="Promo discount" value={`- ${fmt(discount)}`} />}
+                    {discount > 0 && (
+                      <Row
+                        label="Promo discount"
+                        value={`- ${fmt(discount)}`}
+                      />
+                    )}
                     <Row label="Delivery fee" value={fmt(deliveryFee)} />
                     <Row label="Service fee" value={fmt(serviceFee)} />
                     <Row label="Tax" value={fmt(tax)} />
@@ -509,8 +646,13 @@ export default function CheckoutPage() {
                       {placing ? "Placing..." : "Place order"}
                     </Button>
                     {!canPlace && (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                        Select address, payment, and ensure your cart isn’t empty.
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", mt: 1 }}
+                      >
+                        Select address, payment, and ensure your cart isn’t
+                        empty.
                       </Typography>
                     )}
                   </>
@@ -545,7 +687,12 @@ export default function CheckoutPage() {
               {fmt(total)}
             </Typography>
           </Box>
-          <Button variant="contained" disabled={!canPlace} onClick={handlePlaceOrder} sx={ui.blackBtn}>
+          <Button
+            variant="contained"
+            disabled={!canPlace}
+            onClick={handlePlaceOrder}
+            sx={ui.blackBtn}
+          >
             {placing ? "Placing..." : "Place order"}
           </Button>
         </Box>

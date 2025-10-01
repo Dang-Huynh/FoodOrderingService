@@ -36,7 +36,6 @@ import {
 import { useCart } from "../context/CartContext";
 import { getRestaurant } from "../api";
 
-
 /** ---------- Helpers ---------- */
 const clamp = (lines) => ({
   display: "-webkit-box",
@@ -132,12 +131,11 @@ export default function RestaurantMenuPage() {
 
   const addToCart = (item) => {
     if (!restaurant || !restaurant.id) {
-    console.warn("Tried to add item before restaurant loaded");
-    return;
-  }
-
-    const itemWithRestaurant  = { ...item, restaurantId: restaurant.id };
-    add(itemWithRestaurant );              // your CartContext add()
+      console.warn("Tried to add item before restaurant loaded");
+      return;
+    }
+    const itemWithRestaurant = { ...item, restaurantId: restaurant.id };
+    add(itemWithRestaurant); // your CartContext add()
     // also keep raw storage compatible if other code reads localStorage directly
     try {
       const saved = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -310,39 +308,52 @@ export default function RestaurantMenuPage() {
       <Container maxWidth="lg" sx={{ mt: 3 }}>
         {tab === 0
           ? Object.entries(grouped).map(([section, items]) => (
-              <Section key={section} title={section} items={items} onAdd={addToCart} />
+              <Section key={section} title={section} items={items}>
+                <ScrollableDishGrid items={items} onAdd={addToCart} />
+              </Section>
             ))
           : sections[tab - 1] && (
               <Section
                 title={sections[tab - 1]}
                 items={grouped[sections[tab - 1]] || []}
-                onAdd={addToCart}
-              />
+              >
+                <ScrollableDishGrid
+                  items={grouped[sections[tab - 1]] || []}
+                  onAdd={addToCart}
+                />
+              </Section>
             )}
+
+        {/* Unified empty state when searching "All" and nothing matches */}
+        {tab === 0 && Object.keys(grouped).length === 0 && (
+          <Card sx={{ borderRadius: 2, border: "1px solid #eef0f2" }}>
+            <CardContent sx={{ py: 6, textAlign: "center" }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                No dishes match your search
+              </Typography>
+              <Typography color="text.secondary">
+                Try a different keyword or switch the category.
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
       </Container>
     </Box>
   );
 }
 
-/** ---------- Section ---------- */
-function Section({ title, items, onAdd }) {
-  if (!items || !items.length)
-    return (
-      <Typography color="text.secondary" sx={{ mb: 4 }}>
-        No dishes found.
-      </Typography>
-    );
+/** ---------- Sections & Grid (updated) ---------- */
+function Section({ title, items, children }) {
   return (
     <Box sx={{ mb: 4 }}>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
         {title} ({items.length})
       </Typography>
-      <ScrollableDishGrid items={items} onAdd={onAdd} />
+      {children}
     </Box>
   );
 }
 
-/** ---------- Scrollable Dish Grid ---------- */
 function ScrollableDishGrid({ items, onAdd }) {
   const scrollContainerRef = useRef(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -350,7 +361,8 @@ function ScrollableDishGrid({ items, onAdd }) {
 
   const checkScroll = useCallback(() => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setShowLeftArrow(scrollLeft > 0);
       setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
     }
@@ -364,12 +376,17 @@ function ScrollableDishGrid({ items, onAdd }) {
 
   const scroll = (direction) => {
     if (scrollContainerRef.current) {
+      const scrollAmount = 300;
       scrollContainerRef.current.scrollBy({
-        left: direction === "right" ? 300 : -300,
+        left: direction === "right" ? scrollAmount : -scrollAmount,
         behavior: "smooth",
       });
     }
   };
+
+  if (!items.length) {
+    return <Typography color="text.secondary">No dishes here yet.</Typography>;
+  }
 
   return (
     <Box sx={{ position: "relative" }}>
@@ -390,6 +407,7 @@ function ScrollableDishGrid({ items, onAdd }) {
           <ChevronLeftIcon />
         </IconButton>
       )}
+
       <Box
         ref={scrollContainerRef}
         onScroll={checkScroll}
@@ -410,6 +428,7 @@ function ScrollableDishGrid({ items, onAdd }) {
           </Box>
         ))}
       </Box>
+
       {showRightArrow && (
         <IconButton
           onClick={() => scroll("right")}
@@ -431,13 +450,14 @@ function ScrollableDishGrid({ items, onAdd }) {
   );
 }
 
-/** ---------- Dish Card ---------- */
+/** ---------- Uniform Dish Card (no-crop image) ---------- */
 function DishCard({ item, onAdd }) {
   const TITLE_LINES = 1;
   const DESC_LINES = 2;
   const TITLE_LH = 1.35;
   const DESC_LH = 1.45;
   const CARD_HEIGHT = 360;
+  const IMG_FRAME_H = 170; // fixed frame height for image
 
   return (
     <Card
@@ -456,29 +476,39 @@ function DishCard({ item, onAdd }) {
         },
       }}
     >
-      <Box sx={{ position: "relative", pt: "62%", flexShrink: 0 }}>
-        <CardMedia
+      {/* No-crop image frame: centers and CONTAINS the image */}
+      <Box
+        sx={{
+          height: IMG_FRAME_H,
+          backgroundColor: "#fafafa",
+          borderTopLeftRadius: 8,
+          borderTopRightRadius: 8,
+          overflow: "hidden",
+          flexShrink: 0,
+        }}
+      >
+        <Box
           component="img"
-          image={item.image}
+          src={item.image}
           alt={item.name}
+          loading="lazy"
           sx={{
-            position: "absolute",
-            inset: 0,
             width: "100%",
             height: "100%",
-            objectFit: "cover",
-            borderTopLeftRadius: 8,
-            borderTopRightRadius: 8,
+            objectFit: "fill", // <- stretch/squeeze to fill frame (from your 2nd file)
+            display: "block",
           }}
         />
       </Box>
+
+      {/* Content */}
       <CardContent
         sx={{
           display: "flex",
           flexDirection: "column",
           flexGrow: 1,
           p: 2,
-          height: `calc(${CARD_HEIGHT}px - 62%)`,
+          height: `calc(${CARD_HEIGHT}px - ${IMG_FRAME_H}px)`,
         }}
       >
         <Typography
@@ -493,6 +523,7 @@ function DishCard({ item, onAdd }) {
         >
           {item.name}
         </Typography>
+
         <Typography
           variant="body2"
           color="text.secondary"
@@ -506,6 +537,7 @@ function DishCard({ item, onAdd }) {
         >
           {item.description}
         </Typography>
+
         <Box
           sx={{
             display: "flex",
