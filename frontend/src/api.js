@@ -1,47 +1,70 @@
+// src/api.js
+
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
-export default {
-  fetchMenu,
-  fetchOrders,
-  loginUser,
-};
-
-
-// Menu API
-export async function fetchMenu() {
-  const response = await fetch(`${API_URL}/menu/`);
-  if (!response.ok) throw new Error("Failed to fetch menu");
-  return response.json();
+/* -------------------- Public: Restaurants -------------------- */
+export async function getRestaurants() {
+  const res = await fetch(`${API_URL}/menu/restaurants/`);
+  if (!res.ok) throw new Error("Failed to fetch restaurants");
+  return res.json();
 }
 
-// Orders API
-export async function fetchOrders() {
-  const token = localStorage.getItem("access_token");
-  const response = await fetch(`${API_URL}/orders/`, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : "",
-    },
-  });
-  if (!response.ok) throw new Error("Failed to fetch orders");
-  return response.json();
+export async function getRestaurant(id) {
+  const res = await fetch(`${API_URL}/menu/restaurants/${id}/`);
+  if (!res.ok) throw new Error("Failed to fetch restaurant");
+  return res.json();
 }
 
-// Login API
+/* -------------------- Auth -------------------- */
 export async function loginUser(credentials) {
-  const response = await fetch(`${API_URL}/accounts/login/`, {
+  const res = await fetch(`${API_URL}/accounts/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(credentials),
   });
+  if (!res.ok) throw new Error("Login failed");
 
-  if (!response.ok) throw new Error("Login failed");
-
-  const data = await response.json();
-
-  // Save tokens
+  const data = await res.json(); // expects { access, refresh }
   localStorage.setItem("access_token", data.access);
-  localStorage.setItem("refresh_token", data.refresh);
-
+  if (data.refresh) localStorage.setItem("refresh_token", data.refresh);
   return data;
 }
 
+/* -------------------- Protected: Orders -------------------- */
+export async function fetchOrders() {
+  const token = localStorage.getItem("access_token");
+  const res = await fetch(`${API_URL}/orders/`, {
+    headers: { Authorization: token ? `Bearer ${token}` : "" },
+  });
+  if (!res.ok) throw new Error("Failed to fetch orders");
+  return res.json();
+}
+
+export async function placeOrder(payload) {
+  const token = localStorage.getItem("access_token");
+  const res = await fetch(`${API_URL}/orders/place/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to place order");
+  }
+  return res.json();
+}
+
+/* -------------------- Optional default export -------------------- */
+const api = {
+  API_URL,
+  getRestaurants,
+  getRestaurant,
+  loginUser,
+  fetchOrders,
+  placeOrder,
+};
+
+export default api;

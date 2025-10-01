@@ -65,12 +65,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Logout
-  const logout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    delete axios.defaults.headers.common["Authorization"];
-    setUser(null);
-  };
+  function logout() {
+  delete axios.defaults.headers.common["Authorization"];
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  setUser(null);
+}
 
   // Load user on init
   useEffect(() => {

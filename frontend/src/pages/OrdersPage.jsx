@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Container,
@@ -13,6 +13,7 @@ import {
   Divider,
 } from "@mui/material";
 import { Link } from "react-router-dom";
+import { fetchOrders } from "../api";
 
 const ui = {
   pageBg: "#fafbfc",
@@ -24,48 +25,46 @@ const ui = {
   blackBtn: { bgcolor: "black", "&:hover": { bgcolor: "#333" } },
 };
 
-const orders = [
-  {
-    id: 1,
-    date: "2025-09-15",
-    total: "$45.99",
-    status: "Delivered",
-    items: [
-      { name: "Margherita Pizza", quantity: 1, price: 12.99 },
-      { name: "Coca-Cola", quantity: 2, price: 2.99 },
-    ],
-  },
-  {
-    id: 2,
-    date: "2025-09-10",
-    total: "$32.50",
-    status: "In Progress",
-    items: [
-      { name: "Pepperoni Pizza", quantity: 1, price: 14.99 },
-      { name: "Sparkling Water", quantity: 1, price: 3.5 },
-    ],
-  },
-];
-
-const statusColor = (s) =>
-  s === "Delivered" ? "success" : s === "Cancelled" ? "error" : "warning";
+// map backend statuses (e.g., PENDING/PREPARING/DELIVERED/CANCELLED) to chip colors
+const statusColor = (s = "") => {
+  const v = String(s).toLowerCase();
+  if (v.includes("deliver")) return "success";
+  if (v.includes("cancel")) return "error";
+  return "warning"; // pending / preparing / etc.
+};
 
 export default function OrdersPage() {
   const [tab, setTab] = useState(0); // 0 = Active, 1 = Past
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchOrders()
+      .then((data) => mounted && setOrders(data))
+      .catch(() => mounted && setOrders([]))
+      .finally(() => mounted && setLoading(false));
+    return () => { mounted = false; };
+  }, []);
 
   const active = useMemo(
     () =>
       orders.filter(
-        (o) => o.status !== "Delivered" && o.status !== "Cancelled"
+        (o) =>
+          !String(o.status).toLowerCase().includes("deliver") &&
+          !String(o.status).toLowerCase().includes("cancel")
       ),
-    []
+    [orders]
   );
+  
   const past = useMemo(
     () =>
       orders.filter(
-        (o) => o.status === "Delivered" || o.status === "Cancelled"
+        (o) =>
+          String(o.status).toLowerCase().includes("deliver") ||
+          String(o.status).toLowerCase().includes("cancel")
       ),
-    []
+    [orders]  // Fixed: removed extra bracket and comma
   );
 
   const list = tab === 0 ? active : past;
@@ -94,14 +93,20 @@ export default function OrdersPage() {
           </Tabs>
         </Box>
 
-        {list.length === 0 ? (
+        {loading ? (
+          <Card sx={{ ...ui.card }}>
+            <CardContent sx={{ py: 6, textAlign: "center" }}>
+              <Typography color="text.secondary">Loading your orders…</Typography>
+            </CardContent>
+          </Card>
+        ) : list.length === 0 ? (
           <Card sx={{ ...ui.card }}>
             <CardContent sx={{ py: 6, textAlign: "center" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
                 No {tab === 0 ? "active" : "past"} orders yet
               </Typography>
               <Typography color="text.secondary" sx={{ mb: 2 }}>
-                When you place an order, it’ll show up here.
+                When you place an order, it'll show up here.
               </Typography>
               <Button
                 component={Link}
@@ -115,78 +120,96 @@ export default function OrdersPage() {
           </Card>
         ) : (
           <Grid container spacing={3}>
-            {list.map((order) => (
-              <Grid item xs={12} sm={6} md={4} key={order.id}>
-                <Card sx={{ ...ui.card, height: "100%" }}>
-                  <CardContent>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        mb: 1,
-                      }}
-                    >
-                      <Typography variant="h6" sx={{ fontWeight: 700, mr: 2 }}>
-                        Order #{order.id}
+            {list.map((order) => {
+              const created =
+                order.date ||
+                order.created ||
+                order.created_at ||
+                order.timestamp ||
+                null;
+              const createdText = created
+                ? new Date(created).toLocaleString()
+                : "—";
+              const total =
+                order.total_amount ??
+                order.total ??
+                order.totalPrice ??
+                order.amount ??
+                "";
+
+              return (
+                <Grid item xs={12} sm={6} md={4} key={order.id}>
+                  <Card sx={{ ...ui.card, height: "100%" }}>
+                    <CardContent>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          mb: 1,
+                        }}
+                      >
+                        <Typography variant="h6" sx={{ fontWeight: 700, mr: 2 }}>
+                          Order #{order.id}
+                        </Typography>
+
+                        <Chip
+                          label={order.status}
+                          color={statusColor(order.status)}
+                          size="small"
+                          sx={{ ml: "auto" }}
+                        />
+                      </Box>
+
+                      <Typography variant="body2" color="text.secondary">
+                        Placed on {createdText}
                       </Typography>
 
-                      <Chip
-                        label={order.status}
-                        color={statusColor(order.status)}
-                        size="small"
-                        sx={{ ml: "auto" }}
-                      />
-                    </Box>
+                      <Divider sx={{ my: 1.5 }} />
 
-                    <Typography variant="body2" color="text.secondary">
-                      Placed on {order.date}
-                    </Typography>
+                      <Box sx={{ mb: 1 }}>
+                        {(order.items || []).slice(0, 2).map((it, idx) => (
+                          <Typography
+                            key={`${order.id}-it-${idx}`}
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            • {(it.quantity ?? it.qty ?? 1)} × {(it.item_name ?? it.name ?? "Item")}
+                          </Typography>
+                        ))}
+                        {(order.items || []).length > 2 && (
+                          <Typography variant="caption" color="text.secondary">
+                            + {(order.items.length - 2)} more
+                          </Typography>
+                        )}
+                      </Box>
 
-                    <Divider sx={{ my: 1.5 }} />
-
-                    <Box sx={{ mb: 1 }}>
-                      {order.items.slice(0, 2).map((it) => (
-                        <Typography
-                          key={it.name}
-                          variant="body2"
-                          color="text.secondary"
-                        >
-                          • {it.quantity} × {it.name}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 2,
+                        }}
+                      >
+                        <Typography color="text.secondary">Total</Typography>
+                        <Typography sx={{ fontWeight: 700 }}>
+                          {typeof total === "number" ? `$${total.toFixed(2)}` : String(total)}
                         </Typography>
-                      ))}
-                      {order.items.length > 2 && (
-                        <Typography variant="caption" color="text.secondary">
-                          + {order.items.length - 2} more
-                        </Typography>
-                      )}
-                    </Box>
+                      </Box>
 
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        mb: 2,
-                      }}
-                    >
-                      <Typography color="text.secondary">Total</Typography>
-                      <Typography sx={{ fontWeight: 700 }}>
-                        {order.total}
-                      </Typography>
-                    </Box>
-
-                    <Button
-                      component={Link}
-                      to={`/order/${order.id}`}
-                      fullWidth
-                      variant="contained"
-                      sx={ui.blackBtn}
-                    >
-                      View details
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
+                      <Button
+                        component={Link}
+                        to={`/order/${order.id}`}
+                        fullWidth
+                        variant="contained"
+                        sx={ui.blackBtn}
+                      >
+                        View details
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
           </Grid>
         )}
       </Container>

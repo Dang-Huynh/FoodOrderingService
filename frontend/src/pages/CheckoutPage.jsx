@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
 import {
   Box,
   Button,
@@ -23,6 +24,7 @@ import {
   Link,
 } from "@mui/material";
 import { Delete as DeleteIcon } from "@mui/icons-material";
+import { placeOrder } from "../api";
 
 /** ---------------- UI tokens (keeps styling consistent across pages) ---------------- */
 const ui = {
@@ -70,11 +72,25 @@ const mockPayments = [{ id: "pm-default", brand: "Visa", last4: "4242", exp: "04
 function normalizeCart(list) {
   if (!Array.isArray(list)) return [];
   // If already has qty, keep as-is
-  if (list.length && typeof list[0].qty === "number") return list;
+  const lastRestaurantId = localStorage.getItem("lastRestaurantId");
+  if (list.length && typeof list[0].qty === "number") {
+    // backfill restaurantId if missing
+    return list.map((it) =>
+      it.restaurantId || !lastRestaurantId
+        ? it
+        : { ...it, restaurantId: Number(lastRestaurantId) }
+    );
+  }
+  // legacy cart where each click pushed a duplicate item without qty
   const map = new Map();
   list.forEach((it) => {
     const key = it.id;
-    if (!map.has(key)) map.set(key, { ...it, qty: 1 });
+    const base = {
+      ...it,
+      restaurantId:
+        it.restaurantId || (lastRestaurantId ? Number(lastRestaurantId) : undefined),
+    };
+    if (!map.has(key)) map.set(key, { ...base, qty: 1 });
     else map.get(key).qty += 1;
   });
   return Array.from(map.values());
@@ -110,6 +126,7 @@ function Row({ label, value }) {
 /** ---------------- Main Component ---------------- */
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const { clear } = useCart();
 
   const [cart, setCart] = useState(null); // null = loading, [] = empty
   const [addresses, setAddresses] = useState(null);
@@ -202,19 +219,53 @@ export default function CheckoutPage() {
   };
 
   /** Place order (stub) */
-  const placeOrder = async () => {
+  const handlePlaceOrder  = async () => {
     if (!canPlace) return;
     setPlacing(true);
     setError("");
     try {
-      // TODO: call your backend with: cart, addressId, paymentId, deliveryTime, scheduledTime, tipPct, appliedPromo
-      await new Promise((r) => setTimeout(r, 900));
-      localStorage.removeItem("cart");
-      setCart([]);
-      // Navigate to orders list or details page
-      navigate("/orders");
+      // we must know which restaurant this cart belongs to
+      let restaurantId = cart?.[0]?.restaurantId;
+
+      // fallback if missing
+      if (!restaurantId) {
+        const fallback = localStorage.getItem("lastRestaurantId");
+        if (fallback) {
+          restaurantId = parseInt(fallback);
+          // patch all cart items if needed
+          setCart(cart.map(i => ({ ...i, restaurantId })));
+        }
+      }
+      if (!restaurantId) {
+        setError("Missing restaurant reference. Please add items again.");
+        return;
+      }
+
+      // Map cart -> backend items (snapshot required fields)
+      const items = (cart || []).map((it) => ({
+        menu_item_id: it.id,           // MenuItem PK
+        name: it.name,                 // snapshot
+        unit_price: String(it.price),  // snapshot
+        quantity: it.qty ?? it.quantity ?? 1,
+        image: it.image || "",
+      }));
+
+      const payload = {
+        restaurant_id: restaurantId,
+        items,
+      };
+
+      const placed = await placeOrder(payload);
+      clear();
+      navigate(`/order/${placed.id}`); // go to order details
     } catch (e) {
-      setError("Something went wrong placing your order. Please try again.");
+      // surface server detail if present
+      const msg =
+        e?.response?.data?.detail ||
+        e?.response?.data?.message ||
+        e?.message ||
+        "Something went wrong placing your order.";
+      setError(msg);
     } finally {
       setPlacing(false);
     }
@@ -453,7 +504,7 @@ export default function CheckoutPage() {
                       sx={{ mt: 2, ...ui.blackBtn }}
                       variant="contained"
                       disabled={!canPlace}
-                      onClick={placeOrder}
+                      onClick={handlePlaceOrder}
                     >
                       {placing ? "Placing..." : "Place order"}
                     </Button>
@@ -494,7 +545,7 @@ export default function CheckoutPage() {
               {fmt(total)}
             </Typography>
           </Box>
-          <Button variant="contained" disabled={!canPlace} onClick={placeOrder} sx={ui.blackBtn}>
+          <Button variant="contained" disabled={!canPlace} onClick={handlePlaceOrder} sx={ui.blackBtn}>
             {placing ? "Placing..." : "Place order"}
           </Button>
         </Box>

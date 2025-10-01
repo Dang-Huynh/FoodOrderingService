@@ -6,7 +6,6 @@ import React, {
   useRef,
 } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
 import {
   Typography,
   Card,
@@ -35,6 +34,8 @@ import {
   ChevronRight as ChevronRightIcon,
 } from "@mui/icons-material";
 import { useCart } from "../context/CartContext";
+import { getRestaurant } from "../api";
+
 
 /** ---------- Helpers ---------- */
 const clamp = (lines) => ({
@@ -51,7 +52,7 @@ export default function RestaurantMenuPage() {
   const { add, openCart } = useCart();
 
   const [restaurant, setRestaurant] = useState(null);
-  const [menu, setMenu] = useState({}); // now grouped by category
+  const [menu, setMenu] = useState({}); // grouped by category
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -59,36 +60,35 @@ export default function RestaurantMenuPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const apiUrl = import.meta.env.VITE_API_URL; // no trailing slash
-
-  // fetch restaurant and menu from backend
+  // fetch restaurant + grouped menu via API helper
   useEffect(() => {
-    const fetchData = async () => {
+    let mounted = true;
+    (async () => {
       try {
-        const restaurantRes = await axios.get(`${apiUrl}/menu/restaurants/${id}/`);
-        const data = restaurantRes.data;
+        const data = await getRestaurant(id);
+        if (!mounted) return;
         setRestaurant(data);
-
-        // menu is already grouped by category from backend
-        setMenu(data.menu || {}); 
+        setMenu(data.menu || {});
         setSections(Object.keys(data.menu || {}));
         setLoading(false);
-        
       } catch (err) {
         console.error(err);
-        setError("Failed to load restaurant or menu data.");
-        setLoading(false);
+        if (mounted) {
+          setError("Failed to load restaurant or menu data.");
+          setLoading(false);
+        }
       }
+    })();
+    return () => {
+      mounted = false;
     };
-    fetchData();
-  }, [id, apiUrl]);
+  }, [id]);
 
-
-  // favorite persistence
+  // favorites persistence
   useEffect(() => {
     const favKey = `fav_restaurant_${id}`;
-    const savedFav = localStorage.getItem(favKey);
-    setIsFavorite(savedFav ? savedFav === "1" : false);
+    const saved = localStorage.getItem(favKey);
+    setIsFavorite(saved ? saved === "1" : false);
   }, [id]);
 
   useEffect(() => {
@@ -113,8 +113,36 @@ export default function RestaurantMenuPage() {
     return out;
   }, [sections, menu, filterItems]);
 
+  // remember current restaurant id and enforce single-restaurant cart
+  useEffect(() => {
+    // remember last restaurant visited (used to backfill old cart items)
+    localStorage.setItem("lastRestaurantId", String(id));
+
+    // OPTIONAL: if cart exists from another restaurant, clear it
+    try {
+      const saved = JSON.parse(localStorage.getItem("cart") || "[]");
+      if (saved.length) {
+        const rid = saved[0]?.restaurantId;
+        if (rid && String(rid) !== String(id)) {
+          localStorage.removeItem("cart");
+        }
+      }
+    } catch {}
+  }, [id]);
+
   const addToCart = (item) => {
-    add(item);
+    if (!restaurant || !restaurant.id) {
+    console.warn("Tried to add item before restaurant loaded");
+    return;
+  }
+
+    const itemWithRestaurant  = { ...item, restaurantId: restaurant.id };
+    add(itemWithRestaurant );              // your CartContext add()
+    // also keep raw storage compatible if other code reads localStorage directly
+    try {
+      const saved = JSON.parse(localStorage.getItem("cart") || "[]");
+      localStorage.setItem("cart", JSON.stringify([...saved, itemWithRestaurant]));
+    } catch {}
     openCart();
   };
 
@@ -176,11 +204,7 @@ export default function RestaurantMenuPage() {
             "&:hover": { backgroundColor: "#f0f0f0" },
           }}
         >
-          {isFavorite ? (
-            <FavoriteIcon sx={{ color: "red" }} />
-          ) : (
-            <FavoriteBorderIcon />
-          )}
+          {isFavorite ? <FavoriteIcon sx={{ color: "red" }} /> : <FavoriteBorderIcon />}
         </IconButton>
 
         {/* Info overlay */}
@@ -202,8 +226,8 @@ export default function RestaurantMenuPage() {
                 {restaurant.name}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {restaurant.cuisine_type} • {restaurant.distance} •{" "}
-                {restaurant.deliveryTime} • {restaurant.deliveryFee}
+                {restaurant.cuisine_type} • {restaurant.distance} • {restaurant.deliveryTime} •{" "}
+                {restaurant.deliveryFee}
               </Typography>
               {restaurant.offer && (
                 <Box sx={{ display: "flex", alignItems: "center", mt: 0.5 }}>
@@ -286,12 +310,7 @@ export default function RestaurantMenuPage() {
       <Container maxWidth="lg" sx={{ mt: 3 }}>
         {tab === 0
           ? Object.entries(grouped).map(([section, items]) => (
-              <Section
-                key={section}
-                title={section}
-                items={items}
-                onAdd={addToCart}
-              />
+              <Section key={section} title={section} items={items} onAdd={addToCart} />
             ))
           : sections[tab - 1] && (
               <Section

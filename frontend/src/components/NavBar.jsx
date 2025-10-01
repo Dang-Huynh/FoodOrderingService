@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext";
 const ui = { blackBtn: { bgcolor: "black", color: "white", "&:hover": { bgcolor: "#333" } } };
 
 export default function NavBar() {
+  const { user, logout } = useAuth(); // <-- reactive user
   const navigate = useNavigate();
   const location = useLocation();
   const trigger = useScrollTrigger({ disableHysteresis: true, threshold: 0 });
@@ -30,7 +31,6 @@ export default function NavBar() {
   const [query, setQuery] = useState("");
 
   const { count, openCart } = useCart();
-  const { user, logout } = useAuth(); // <-- reactive user
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + "/");
 
@@ -40,6 +40,11 @@ export default function NavBar() {
     navigate(`/menu?query=${encodeURIComponent(q)}`);
     setQuery("");
     setMobileOpen(false);
+  };
+
+  const handleLogout = () => {
+    logout(); 
+    navigate("/login");
   };
 
   return (
@@ -109,7 +114,7 @@ export default function NavBar() {
 
               {/* Reactive login/logout */}
               {user ? (
-                <Button onClick={logout} variant="contained" sx={ui.blackBtn}>Logout</Button>
+                <Button onClick={handleLogout} variant="contained" sx={ui.blackBtn}>Logout</Button>
               ) : (
                 <>
                   <Button component={RouterLink} to="/login" startIcon={<LoginIcon />} variant="contained" sx={{ ...ui.blackBtn, display: { xs: "none", md: "inline-flex" } }}>Login</Button>

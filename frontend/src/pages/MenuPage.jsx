@@ -21,6 +21,7 @@ import {
   Search as SearchIcon,
 } from "@mui/icons-material";
 import axios from "axios";
+import { getRestaurants } from "../api";
 
 /** ---------- UI tokens ---------- */
 const ui = {
@@ -76,10 +77,8 @@ function MenuPage() {
 
   /** Fetch restaurants from backend */
   useEffect(() => {
-    const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
-    axios
-      .get(`${API_URL}/menu/restaurants/`)
-      .then((res) => setRestaurantsList(res.data))
+    getRestaurants()
+      .then(setRestaurantsList)
       .catch((err) => console.error(err));
   }, []);
 
