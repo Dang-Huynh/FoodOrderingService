@@ -1,0 +1,34 @@
+src/
+  components/
+    common/
+      ChipGroup.jsx        # Reusable chip selector (ASAP vs Schedule, Tip %, etc.)
+      Row.jsx              # Simple label/value row for totals
+    cards/
+      DishCard.jsx         # Card for menu items
+      RestaurantCard.jsx   # Card for restaurants
+    checkout/
+      AddressSelection.jsx # Address list for checkout
+      PaymentSelection.jsx # Payment methods list for checkout
+      DeliveryOptions.jsx  # Time (ASAP/Schedule) + Tip control
+      OrderSummary.jsx     # Adjust quantity + Add/Remove items
+    profile/
+      AddressCard.jsx      # Card for profile saved addresses
+      PaymentCard.jsx      # Card for profile saved payments
+      PreferencesPanel.jsx # Notification / settings toggles
+      FavoriteRestaurants.jsx # Grid of user’s saved restaurants
+  context/
+    CartContext.jsx        # Cart state (add, remove, inc, dec, clear)
+  hooks/
+    useRestaurantMenu.js   # Fetch + filter restaurant menu
+    usePersistedState.js   # State with localStorage persistence
+  pages/
+    HomePage.jsx
+    MenuPage.jsx
+    RestaurantMenuPage.jsx
+    SavedRestaurantsPage.jsx
+    OrdersPage.jsx
+    OrderDetailsPage.jsx
+    CheckoutPage.jsx
+    ProfilePage.jsx
+  ui.js                    # Shared design tokens
+  api.js                   # API helpers (getRestaurant, placeOrder, etc.)
