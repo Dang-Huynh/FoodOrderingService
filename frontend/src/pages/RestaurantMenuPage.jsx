@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useState,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -12,7 +6,6 @@ import {
   CardContent,
   CardMedia,
   Button,
-  Grid,
   Box,
   Chip,
   IconButton,
@@ -34,7 +27,11 @@ import {
   ChevronRight as ChevronRightIcon,
 } from "@mui/icons-material";
 import { useCart } from "../context/CartContext";
-import { getRestaurant } from "../api";
+
+// shared hook + components
+import useRestaurantMenu from "../hooks/useRestaurantMenu";
+import { usePersistedState } from "../hooks/usePersistedState";
+import DishCard from "../components/cards/DishCard";
 
 /** ---------- Helpers ---------- */
 const clamp = (lines) => ({
@@ -50,38 +47,29 @@ export default function RestaurantMenuPage() {
   const navigate = useNavigate();
   const { add, openCart } = useCart();
 
-  const [restaurant, setRestaurant] = useState(null);
-  const [menu, setMenu] = useState({}); // grouped by category
-  const [sections, setSections] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // persist search across visits per-restaurant
+  const [searchQuery, setSearchQuery] = usePersistedState(
+    `menu_search_${id}`,
+    ""
+  );
   const [tab, setTab] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isFavorite, setIsFavorite] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // fetch restaurant + grouped menu via API helper
+  // restaurant, sections, grouped (filtered by searchQuery)
+  const {
+    restaurant,
+    grouped,
+    sections,
+    loading: hookLoading,
+    error: hookError,
+  } = useRestaurantMenu(id, searchQuery);
+
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const data = await getRestaurant(id);
-        if (!mounted) return;
-        setRestaurant(data);
-        setMenu(data.menu || {});
-        setSections(Object.keys(data.menu || {}));
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        if (mounted) {
-          setError("Failed to load restaurant or menu data.");
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [id]);
+    setLoading(hookLoading);
+    setError(hookError || null);
+  }, [hookLoading, hookError]);
 
   // favorites persistence
   useEffect(() => {
@@ -95,29 +83,9 @@ export default function RestaurantMenuPage() {
     localStorage.setItem(favKey, isFavorite ? "1" : "0");
   }, [id, isFavorite]);
 
-  const filterItems = useCallback(
-    (items) =>
-      items.filter((item) =>
-        item.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
-      ),
-    [searchQuery]
-  );
-
-  const grouped = useMemo(() => {
-    const out = {};
-    sections.forEach((s) => {
-      const list = Array.isArray(menu[s]) ? filterItems(menu[s]) : [];
-      if (list.length) out[s] = list;
-    });
-    return out;
-  }, [sections, menu, filterItems]);
-
   // remember current restaurant id and enforce single-restaurant cart
   useEffect(() => {
-    // remember last restaurant visited (used to backfill old cart items)
     localStorage.setItem("lastRestaurantId", String(id));
-
-    // OPTIONAL: if cart exists from another restaurant, clear it
     try {
       const saved = JSON.parse(localStorage.getItem("cart") || "[]");
       if (saved.length) {
@@ -130,13 +98,9 @@ export default function RestaurantMenuPage() {
   }, [id]);
 
   const addToCart = (item) => {
-    if (!restaurant || !restaurant.id) {
-      console.warn("Tried to add item before restaurant loaded");
-      return;
-    }
+    if (!restaurant || !restaurant.id) return;
     const itemWithRestaurant = { ...item, restaurantId: restaurant.id };
-    add(itemWithRestaurant); // your CartContext add()
-    // also keep raw storage compatible if other code reads localStorage directly
+    add(itemWithRestaurant);
     try {
       const saved = JSON.parse(localStorage.getItem("cart") || "[]");
       localStorage.setItem("cart", JSON.stringify([...saved, itemWithRestaurant]));
@@ -245,7 +209,7 @@ export default function RestaurantMenuPage() {
         </Container>
       </Box>
 
-      {/* Sticky Tabs */}
+      {/* Sticky Tabs + Search */}
       <Box
         sx={{
           position: "sticky",
@@ -309,7 +273,7 @@ export default function RestaurantMenuPage() {
         {tab === 0
           ? Object.entries(grouped).map(([section, items]) => (
               <Section key={section} title={section} items={items}>
-                <ScrollableDishGrid items={items} onAdd={addToCart} />
+                <ScrollableDishRow items={items} onAdd={addToCart} />
               </Section>
             ))
           : sections[tab - 1] && (
@@ -317,14 +281,14 @@ export default function RestaurantMenuPage() {
                 title={sections[tab - 1]}
                 items={grouped[sections[tab - 1]] || []}
               >
-                <ScrollableDishGrid
+                <ScrollableDishRow
                   items={grouped[sections[tab - 1]] || []}
                   onAdd={addToCart}
                 />
               </Section>
             )}
 
-        {/* Unified empty state when searching "All" and nothing matches */}
+        {/* empty state when searching "All" and nothing matches */}
         {tab === 0 && Object.keys(grouped).length === 0 && (
           <Card sx={{ borderRadius: 2, border: "1px solid #eef0f2" }}>
             <CardContent sx={{ py: 6, textAlign: "center" }}>
@@ -342,7 +306,7 @@ export default function RestaurantMenuPage() {
   );
 }
 
-/** ---------- Sections & Grid (updated) ---------- */
+/** ---------- Sections & Row ---------- */
 function Section({ title, items, children }) {
   return (
     <Box sx={{ mb: 4 }}>
@@ -354,7 +318,7 @@ function Section({ title, items, children }) {
   );
 }
 
-function ScrollableDishGrid({ items, onAdd }) {
+function ScrollableDishRow({ items, onAdd }) {
   const scrollContainerRef = useRef(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
@@ -447,125 +411,5 @@ function ScrollableDishGrid({ items, onAdd }) {
         </IconButton>
       )}
     </Box>
-  );
-}
-
-/** ---------- Uniform Dish Card (no-crop image) ---------- */
-function DishCard({ item, onAdd }) {
-  const TITLE_LINES = 1;
-  const DESC_LINES = 2;
-  const TITLE_LH = 1.35;
-  const DESC_LH = 1.45;
-  const CARD_HEIGHT = 360;
-  const IMG_FRAME_H = 170; // fixed frame height for image
-
-  return (
-    <Card
-      sx={{
-        borderRadius: 2,
-        border: "1px solid #eef0f2",
-        boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: CARD_HEIGHT,
-        transition: "transform 0.2s, box-shadow 0.2s",
-        "&:hover": {
-          transform: "translateY(-2px)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-        },
-      }}
-    >
-      {/* No-crop image frame: centers and CONTAINS the image */}
-      <Box
-        sx={{
-          height: IMG_FRAME_H,
-          backgroundColor: "#fafafa",
-          borderTopLeftRadius: 8,
-          borderTopRightRadius: 8,
-          overflow: "hidden",
-          flexShrink: 0,
-        }}
-      >
-        <Box
-          component="img"
-          src={item.image}
-          alt={item.name}
-          loading="lazy"
-          sx={{
-            width: "100%",
-            height: "100%",
-            objectFit: "fill", // <- stretch/squeeze to fill frame (from your 2nd file)
-            display: "block",
-          }}
-        />
-      </Box>
-
-      {/* Content */}
-      <CardContent
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          flexGrow: 1,
-          p: 2,
-          height: `calc(${CARD_HEIGHT}px - ${IMG_FRAME_H}px)`,
-        }}
-      >
-        <Typography
-          variant="subtitle1"
-          sx={{
-            fontWeight: 700,
-            lineHeight: TITLE_LH,
-            height: `${TITLE_LINES * TITLE_LH}em`,
-            mb: 0.5,
-            ...clamp(TITLE_LINES),
-          }}
-        >
-          {item.name}
-        </Typography>
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{
-            lineHeight: DESC_LH,
-            height: `${DESC_LINES * DESC_LH}em`,
-            mb: 1,
-            flexGrow: 1,
-            ...clamp(DESC_LINES),
-          }}
-        >
-          {item.description}
-        </Typography>
-
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            mt: "auto",
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            ${Number(item.price).toFixed(2)}
-          </Typography>
-          <Button
-            onClick={onAdd}
-            variant="contained"
-            size="small"
-            sx={{
-              bgcolor: "black",
-              color: "white",
-              borderRadius: 999,
-              px: 2,
-              fontWeight: 700,
-              "&:hover": { bgcolor: "#333" },
-            }}
-          >
-            Add
-          </Button>
-        </Box>
-      </CardContent>
-    </Card>
   );
 }

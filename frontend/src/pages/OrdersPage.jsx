@@ -64,7 +64,7 @@ export default function OrdersPage() {
           String(o.status).toLowerCase().includes("deliver") ||
           String(o.status).toLowerCase().includes("cancel")
       ),
-    [orders]  // Fixed: removed extra bracket and comma
+    [orders]  
   );
 
   const list = tab === 0 ? active : past;
