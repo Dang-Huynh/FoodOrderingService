@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   Button,
-  CircularProgress,
 } from "@mui/material";
 import {
   Restaurant as RestaurantIcon,
@@ -18,30 +17,6 @@ import {
 } from "@mui/icons-material";
 
 function HomePage() {
-  const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
-
-  const [restaurants, setRestaurants] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    async function fetchRestaurants() {
-      try {
-        setLoading(true);
-        const res = await fetch(`${API_URL}/menu/restaurants/`);
-        if (!res.ok) throw new Error("Failed to load restaurants");
-        const data = await res.json();
-        setRestaurants(data);
-        setError("");
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchRestaurants();
-  }, [API_URL]);
-
   return (
     <Box sx={{ bgcolor: "#f5f5f5", minHeight: "100vh" }}>
       {/* Hero */}
@@ -80,7 +55,7 @@ function HomePage() {
             <Box sx={{ display: "inline-flex", gap: 1 }}>
               <Button
                 component={RouterLink}
-                to="/menu" // Working path
+                to="/menu"
                 variant="contained"
                 sx={{
                   bgcolor: "white",
@@ -236,40 +211,6 @@ function HomePage() {
             </Card>
           </Grid>
         </Grid>
-      </Container>
-
-      {/* Restaurants Preview */}
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
-          Popular Restaurants
-        </Typography>
-
-        {loading ? (
-          <CircularProgress />
-        ) : error ? (
-          <Typography color="error">{error}</Typography>
-        ) : (
-          <Grid container spacing={3}>
-            {restaurants.slice(0, 3).map((r) => (
-              <Grid item xs={12} sm={6} md={4} key={r.id}>
-                <Card
-                  component={RouterLink}
-                  to={`/restaurant/${r.id}`}
-                  sx={{ p: 2, textDecoration: "none" }}
-                >
-                  <CardContent>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      {r.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {r.description || "Delicious meals available"}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        )}
       </Container>
     </Box>
   );

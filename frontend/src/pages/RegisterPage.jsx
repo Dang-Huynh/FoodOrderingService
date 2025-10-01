@@ -1,14 +1,26 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import "./LoginPage.css";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import {
+  Box,
+  Paper,
+  TextField,
+  Button,
+  Typography,
+  Link,
+  Alert,
+  CircularProgress,
+  Divider,
+} from "@mui/material";
 
-function RegisterPage() {
+export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState(null);
+
+  const [error, setError]     = useState(null);
   const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -21,28 +33,31 @@ function RegisterPage() {
     }
 
     setLoading(true);
-
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/accounts/register/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: fullName,
-          email,
-          password,
-        }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/accounts/register/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            full_name: fullName,
+            email,
+            password,
+          }),
+        }
+      );
+
+      const data = await response.json();
 
       if (!response.ok) {
-        const data = await response.json();
-        setError(data.detail || "Registration failed");
+        setError(data?.detail || "Registration failed");
         setLoading(false);
         return;
       }
 
-      const data = await response.json();
-      localStorage.setItem("token", data.access); // store JWT token
-      navigate("/"); // redirect to homepage
+      // store JWT token (unchanged behavior)
+      localStorage.setItem("token", data.access);
+      navigate("/");
     } catch (err) {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -51,60 +66,129 @@ function RegisterPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h1 className="auth-title">Create your account</h1>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        bgcolor: "#fafafa",
+        p: 2,
+      }}
+    >
+      <Paper
+        elevation={3}
+        sx={{
+          p: 4,
+          width: "100%",
+          maxWidth: 420,
+          borderRadius: 2,
+          textAlign: "center",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+          border: "1px solid #eef0f2",
+        }}
+      >
+        <Typography variant="h5" fontWeight={800} mb={2}>
+          Create your account
+        </Typography>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Full Name"
+        {error && (
+          <Alert severity="error" sx={{ mb: 2, textAlign: "left" }}>
+            {error}
+          </Alert>
+        )}
+
+        <Box
+          component="form"
+          noValidate
+          onSubmit={handleSubmit}
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+        >
+          <TextField
+            label="Full Name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            fullWidth
             required
           />
-          <input
+          <TextField
             type="email"
-            placeholder="Email address"
+            label="Email address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            fullWidth
             required
           />
-          <input
+          <TextField
             type="password"
-            placeholder="Password"
+            label="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            fullWidth
             required
           />
-          <input
+          <TextField
             type="password"
-            placeholder="Confirm Password"
+            label="Confirm Password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
+            fullWidth
             required
           />
 
-          {error && <p className="auth-error">{error}</p>}
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            disabled={loading}
+            sx={{
+              bgcolor: "black",
+              fontWeight: 700,
+              py: 1.25,
+              "&:hover": { bgcolor: "#333" },
+            }}
+          >
+            {loading ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Sign Up"}
+          </Button>
+        </Box>
 
-          <button type="submit" className="auth-btn">
-            {loading ? "Signing up..." : "Sign Up"}
-          </button>
-        </form>
+        <Box
+          sx={{
+            my: 2,
+            display: "grid",
+            gridTemplateColumns: "1fr auto 1fr",
+            alignItems: "center",
+            columnGap: 1.5,
+            color: "text.secondary",
+            fontSize: 14,
+          }}
+        >
+          <Divider />
+          <span>or</span>
+          <Divider />
+        </Box>
 
-        <div className="auth-divider">or</div>
+        <Button
+          variant="outlined"
+          fullWidth
+          sx={{
+            borderColor: "#ddd",
+            py: 1.1,
+            textTransform: "none",
+            fontWeight: 600,
+            bgcolor: "#fefefe",
+          }}
+        >
+          Continue with Google
+        </Button>
 
-        <button className="google-btn">Continue with Google</button>
-
-        <p className="auth-footer">
+        <Typography variant="body2" mt={2}>
           Already have an account?{" "}
-          <Link to="/login" className="auth-link">
+          <Link component={RouterLink} to="/login" underline="hover">
             Sign in
           </Link>
-        </p>
-      </div>
-    </div>
+        </Typography>
+      </Paper>
+    </Box>
   );
 }
-
-export default RegisterPage;
