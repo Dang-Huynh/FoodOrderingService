@@ -76,8 +76,9 @@ function MenuPage() {
 
   /** Fetch restaurants from backend */
   useEffect(() => {
+    const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
     axios
-      .get("http://127.0.0.1:8000/api/menu/restaurants/")
+      .get(`${API_URL}/menu/restaurants/`)
       .then((res) => setRestaurantsList(res.data))
       .catch((err) => console.error(err));
   }, []);
@@ -117,18 +118,14 @@ function MenuPage() {
 
       if (selectedCategory === "All") return true;
       if (selectedCategory === "Deals") return !!r.offer;
-      if (selectedCategory === "Promoted") return !!r.promoted;
-      if (selectedCategory === "Fast & Cheap")
-        return (
+      if (selectedCategory === "Fast & Cheap") {
+        return 
           normalizeFee(r.deliveryFee) <= 1.99 &&
-          minDeliveryMins(r.deliveryTime) <= 20
-        );
+          minDeliveryMins(r.deliveryTime) <= 20;
+      }
 
-      const inTags = r.tags?.includes(selectedCategory);
-      const inCuisine = r.cuisine_type
-        .toLowerCase()
-        .includes(selectedCategory.toLowerCase());
-      return inTags || inCuisine;
+      // otherwise match category name against cuisine_type
+      return r.cuisine_type?.toLowerCase().includes(selectedCategory.toLowerCase());
     });
   }, [restaurantsList, query, selectedCategory]);
 

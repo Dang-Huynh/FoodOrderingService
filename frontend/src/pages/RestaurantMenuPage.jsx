@@ -202,7 +202,7 @@ export default function RestaurantMenuPage() {
                 {restaurant.name}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {restaurant.cuisine} • {restaurant.distance} •{" "}
+                {restaurant.cuisine_type} • {restaurant.distance} •{" "}
                 {restaurant.deliveryTime} • {restaurant.deliveryFee}
               </Typography>
               {restaurant.offer && (
