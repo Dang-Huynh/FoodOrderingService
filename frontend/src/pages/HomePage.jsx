@@ -80,7 +80,7 @@ function HomePage() {
             <Box sx={{ display: "inline-flex", gap: 1 }}>
               <Button
                 component={RouterLink}
-                to="/restaurants"
+                to="/menu" // Working path
                 variant="contained"
                 sx={{
                   bgcolor: "white",
@@ -96,7 +96,7 @@ function HomePage() {
               </Button>
               <Button
                 component={RouterLink}
-                to="/deals"
+                to="/menu?category=Deals"
                 variant="outlined"
                 sx={{
                   color: "white",
@@ -123,36 +123,116 @@ function HomePage() {
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
         <Grid container spacing={3}>
           <Grid item xs={12} sm={6} md={4}>
-            <Card sx={{ textAlign: "center", p: 3, borderRadius: "16px" }}>
-              <RestaurantIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                Wide Variety
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Explore hundreds of local spots and top-rated picks.
-              </Typography>
+            <Card
+              sx={{
+                textAlign: "center",
+                p: 3,
+                borderRadius: "16px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                border: "1px solid",
+                borderColor: "divider",
+                height: "100%",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                <Box
+                  sx={{
+                    bgcolor: "#f5f5f5",
+                    borderRadius: "50%",
+                    width: 80,
+                    height: 80,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <RestaurantIcon sx={{ fontSize: 40, color: "primary.main" }} />
+                </Box>
+              </Box>
+              <CardContent sx={{ p: 0 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                  Wide Variety
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Explore hundreds of local spots and top-rated picks.
+                </Typography>
+              </CardContent>
             </Card>
           </Grid>
+
           <Grid item xs={12} sm={6} md={4}>
-            <Card sx={{ textAlign: "center", p: 3, borderRadius: "16px" }}>
-              <DeliveryIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                Fast Delivery
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Live tracking and reliable ETAs, every time.
-              </Typography>
+            <Card
+              sx={{
+                textAlign: "center",
+                p: 3,
+                borderRadius: "16px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                border: "1px solid",
+                borderColor: "divider",
+                height: "100%",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                <Box
+                  sx={{
+                    bgcolor: "#f5f5f5",
+                    borderRadius: "50%",
+                    width: 80,
+                    height: 80,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <DeliveryIcon sx={{ fontSize: 40, color: "primary.main" }} />
+                </Box>
+              </Box>
+              <CardContent sx={{ p: 0 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                  Fast Delivery
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Live tracking and reliable ETAs, every time.
+                </Typography>
+              </CardContent>
             </Card>
           </Grid>
+
           <Grid item xs={12} sm={6} md={4}>
-            <Card sx={{ textAlign: "center", p: 3, borderRadius: "16px" }}>
-              <PaymentIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                Easy Payments
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Secure checkout with cards and saved methods.
-              </Typography>
+            <Card
+              sx={{
+                textAlign: "center",
+                p: 3,
+                borderRadius: "16px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                border: "1px solid",
+                borderColor: "divider",
+                height: "100%",
+              }}
+            >
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+                <Box
+                  sx={{
+                    bgcolor: "#f5f5f5",
+                    borderRadius: "50%",
+                    width: 80,
+                    height: 80,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <PaymentIcon sx={{ fontSize: 40, color: "primary.main" }} />
+                </Box>
+              </Box>
+              <CardContent sx={{ p: 0 }}>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                  Easy Payments
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Secure checkout with cards and saved methods.
+                </Typography>
+              </CardContent>
             </Card>
           </Grid>
         </Grid>
@@ -174,7 +254,7 @@ function HomePage() {
               <Grid item xs={12} sm={6} md={4} key={r.id}>
                 <Card
                   component={RouterLink}
-                  to={`/restaurants/${r.id}`}
+                  to={`/restaurant/${r.id}`}
                   sx={{ p: 2, textDecoration: "none" }}
                 >
                   <CardContent>
