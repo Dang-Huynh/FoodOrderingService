@@ -41,8 +41,10 @@ const ui = {
 /** ---------- Categories ---------- */
 const categories = [
   "All",
+  "American",
   "Pizza",
   "Sushi",
+  "Japanese",
   "Burgers",
   "Indian",
   "Vegan",
